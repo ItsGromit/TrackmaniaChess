@@ -1,7 +1,7 @@
 FROM node:18-alpine
 
 WORKDIR /app
-COPY package.json .
+COPY /chess-server/package.json .
 COPY /chess-server/server.js .
 
 RUN npm install
