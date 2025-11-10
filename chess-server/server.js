@@ -1,6 +1,4 @@
 const net = require('net');
-const http = require('http');
-const WebSocket = require('ws');
 
 const games = new Map(); // gameId -> {white: socket, black: socket, state: boardState}
 const queue = []; // (deprecated) kept for backward compat
@@ -8,18 +6,10 @@ const queue = []; // (deprecated) kept for backward compat
 // Lobby system
 const lobbies = new Map(); // lobbyId -> {id, host, players: [socket], open}
 
-// Track connected plain TCP clients and websocket clients
+// Track connected plain TCP clients
 const clients = new Set();
 
-// Helper to normalize send for different socket types
-function makeWrapperForWS(ws) {
-    ws.id = Math.random().toString(36).substr(2, 9);
-    ws.sendJson = (obj) => {
-        try { ws.send(JSON.stringify(obj)); } catch (e) { console.error('WS send error', e); }
-    };
-    ws.closeSocket = () => { try { ws.close(); } catch (e) {} };
-    return ws;
-}
+// Helper to normalize send for different socket types (primarily TCP in this build)
 
 function sendToClient(c, obj) {
     // TCP sockets use write(), ws uses send()
@@ -67,52 +57,8 @@ function handleMessage(socket, data) {
     }
 }
 
-// --- HTTP + WebSocket server (for Railway) ---
-const httpPort = process.env.PORT || 29801;
-const httpServer = http.createServer((req, res) => {
-    // simple health endpoint and optional debug
-    if (req.url === '/health') {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ status: 'ok' }));
-        return;
-    }
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('Chess server running');
-});
-
-const wss = new WebSocket.Server({ noServer: true });
-
-wss.on('connection', (ws, req) => {
-    makeWrapperForWS(ws);
-    clients.add(ws);
-    console.log('New WebSocket client connected', ws.id);
-
-    ws.on('message', (message) => {
-        try {
-            const data = JSON.parse(message.toString());
-            handleMessage(ws, data);
-        } catch (e) { console.error('WS message parse error', e); }
-    });
-
-    ws.on('close', () => {
-        console.log('WS client disconnected', ws.id);
-        clients.delete(ws);
-        handleDisconnect(ws);
-    });
-    ws.on('error', (err) => console.error('WS error', err));
-});
-
-httpServer.on('upgrade', (request, socket, head) => {
-    // handle websocket upgrade
-    wss.handleUpgrade(request, socket, head, (ws) => {
-        wss.emit('connection', ws, request);
-    });
-});
-
-httpServer.listen(httpPort, () => console.log(`HTTP/WebSocket server listening on port ${httpPort}`));
-
-// --- Raw TCP server (kept for Trackmania Net::Socket local testing if desired) ---
-const tcpPort = process.env.TCP_PORT || 29802;
+// Single TCP server (Railway can set PORT for TCP if supported)
+const port = process.env.PORT || process.env.TCP_PORT || 29802;
 const tcpServer = net.createServer((socket) => {
     console.log('New TCP client connected');
     socket.id = Math.random().toString(36).substr(2, 9);
@@ -149,7 +95,7 @@ const tcpServer = net.createServer((socket) => {
     });
 });
 
-tcpServer.listen(tcpPort, () => console.log(`TCP server listening on port ${tcpPort}`));
+tcpServer.listen(port, () => console.log(`TCP server listening on port ${port}`));
 
 function handleJoinQueue(socket) {
     console.log(`Player ${socket.id} joined queue`);
@@ -383,4 +329,4 @@ function handleDisconnect(socket) {
     }
 }
 
-console.log(`Chess server initialized (httpPort=${httpPort}, tcpPort=${tcpPort})`);
+console.log(`Chess server initialized (port=${port})`);

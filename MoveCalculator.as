@@ -21,21 +21,21 @@ string GetPieceUnicode(Piece piece) {
     
     if (piece.color == PieceColor::White) {
         switch (piece.type) {
-            case PieceType::King: return "♔";
-            case PieceType::Queen: return "♕";
-            case PieceType::Rook: return "♖";
-            case PieceType::Bishop: return "♗";
-            case PieceType::Knight: return "♘";
-            case PieceType::Pawn: return "♙";
+            case PieceType::King: return "/assets/white_king.png";
+            case PieceType::Queen: return "/assets/white_queen.png";
+            case PieceType::Rook: return "/assets/white_rook.png";
+            case PieceType::Bishop: return "/assets/white_bishop.png";
+            case PieceType::Knight: return "/assets/white_knight.png";
+            case PieceType::Pawn: return "/assets/white_pawn.png";
         }
     } else {
         switch (piece.type) {
-            case PieceType::King: return "♚";
-            case PieceType::Queen: return "♛";
-            case PieceType::Rook: return "♜";
-            case PieceType::Bishop: return "♝";
-            case PieceType::Knight: return "♞";
-            case PieceType::Pawn: return "♟";
+            case PieceType::King: return "/assets/black_king.png";
+            case PieceType::Queen: return "/assets/black_queen.png";
+            case PieceType::Rook: return "/assets/black_rook.png";
+            case PieceType::Bishop: return "/assets/black_bishop.png";
+            case PieceType::Knight: return "/assets/black_knight.png";
+            case PieceType::Pawn: return "/assets/black_pawn.png";
         }
     }
     return "";

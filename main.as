@@ -2,6 +2,9 @@
 ChessBoardSetup chessBoard = ChessBoardSetup();
 
 bool showWindow = true;
+// UI overrides for network host/port
+string ui_serverHost = "";
+string ui_serverPort = "";
 // shared state lives in Globals.as
 
 void Main() {
@@ -35,9 +38,30 @@ void Render() {
             case GameState::Menu: {
                 UI::Text("Chess Online");
                 UI::Separator();
-                
+                // Server override fields
+                UI::Text("Server Host:");
+                UI::SameLine();
+                UI::SetNextItemWidth(250);
+                ui_serverHost = UI::InputText("Host", ui_serverHost);
+                if (ui_serverHost == "") ui_serverHost = Network::serverHost;
+                UI::Text("Server Port:");
+                UI::SameLine();
+                UI::SetNextItemWidth(120);
+                ui_serverPort = UI::InputText("Port", ui_serverPort);
+                if (ui_serverPort == "") ui_serverPort = "" + Network::serverPort;
+
+                if (UI::Button("Apply Settings")) {
+                    if (ui_serverHost != "") Network::SetServerHost(ui_serverHost);
+                    if (ui_serverPort != "") Network::SetServerPortString(ui_serverPort);
+                }
+
+                UI::Separator();
+
                 if (UI::Button("Play Online")) {
                     if (!Network::isConnected) {
+                        // ensure UI overrides are applied as a convenience
+                        if (ui_serverHost != "") Network::SetServerHost(ui_serverHost);
+                        if (ui_serverPort != "") Network::SetServerPortString(ui_serverPort);
                         if (Network::Connect()) {
                             GameManager::currentState = GameState::InQueue;
                             // request available lobbies

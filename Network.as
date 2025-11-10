@@ -1,10 +1,13 @@
 namespace Network {
     Net::Socket@ sock;
-    // Default to localhost which is easiest for local testing. If you're running the server
-    // inside Docker and exposing the port, use 127.0.0.1 or the host address. Change this
-    // value if your server runs elsewhere.
-    string serverHost = "trackmaniachess.up.railway.app";
-    int serverPort = 29801;
+    // Default host/port for plain TCP (Trackmania's Net::Socket uses plain TCP).
+    // For local testing run the server locally and keep the defaults (127.0.0.1:29802).
+    // NOTE: Railway may or may not expose raw TCP ports depending on plan/configuration.
+    // If Railway exposes TCP for your project, you can point the plugin at that host:port.
+    // Otherwise run the server on a host that exposes raw TCP (VPS, cloud VM) and change
+    // these values accordingly.
+    string serverHost = "trackmaniachess.up.railway.app"; // change to your server host when deploying
+    int serverPort = 29802; // matches server's TCP listener (TCP_PORT)
     bool isConnected = false;
     string playerId;
     string opponentId;
@@ -37,6 +40,26 @@ namespace Network {
     void Init() {
         @sock = Net::Socket();
         if (debug) print("Network: Initialized socket");
+    }
+
+    // Allow runtime override of host/port from the UI
+    void SetServerHost(const string &in host) {
+        if (host.Length > 0) serverHost = host;
+    }
+
+    void SetServerPortString(const string &in portStr) {
+        if (portStr.Length == 0) return;
+        int p = 0;
+        for (uint i = 0; i < portStr.Length; i++) {
+            uint c = uint(portStr[i]);
+            if (c >= 48 && c <= 57) {
+                p = p * 10 + int(c - 48);
+            } else {
+                // stop at first non-digit
+                break;
+            }
+        }
+        if (p > 0) serverPort = p;
     }
 
     bool Connect() {
