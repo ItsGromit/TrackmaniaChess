@@ -1,0 +1,10 @@
+{
+  "name": "chess-server",
+  "version": "1.0.0",
+  "description": "Chess game server for Trackmania",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {}
+}
