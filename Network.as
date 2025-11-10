@@ -3,7 +3,7 @@ namespace Network {
     // Default to localhost which is easiest for local testing. If you're running the server
     // inside Docker and exposing the port, use 127.0.0.1 or the host address. Change this
     // value if your server runs elsewhere.
-    string serverHost = "127.0.0.1";
+    string serverHost = "trackmaniachess.up.railway.app";
     int serverPort = 29801;
     bool isConnected = false;
     string playerId;

@@ -1,4 +1,6 @@
 const net = require('net');
+const http = require('http');
+const WebSocket = require('ws');
 
 const games = new Map(); // gameId -> {white: socket, black: socket, state: boardState}
 const queue = []; // (deprecated) kept for backward compat
@@ -6,10 +8,112 @@ const queue = []; // (deprecated) kept for backward compat
 // Lobby system
 const lobbies = new Map(); // lobbyId -> {id, host, players: [socket], open}
 
-// Track connected plain TCP clients
+// Track connected plain TCP clients and websocket clients
 const clients = new Set();
 
-const server = net.createServer((socket) => {
+// Helper to normalize send for different socket types
+function makeWrapperForWS(ws) {
+    ws.id = Math.random().toString(36).substr(2, 9);
+    ws.sendJson = (obj) => {
+        try { ws.send(JSON.stringify(obj)); } catch (e) { console.error('WS send error', e); }
+    };
+    ws.closeSocket = () => { try { ws.close(); } catch (e) {} };
+    return ws;
+}
+
+function sendToClient(c, obj) {
+    // TCP sockets use write(), ws uses send()
+    if (!c) return;
+    if (typeof c.write === 'function') {
+        // TCP: append newline
+        try { c.write(JSON.stringify(obj) + "\n"); } catch (e) { console.error('TCP write error', e); }
+    } else if (typeof c.send === 'function') {
+        try { c.send(JSON.stringify(obj)); } catch (e) { console.error('WS send error', e); }
+    } else if (typeof c.sendJson === 'function') {
+        c.sendJson(obj);
+    }
+}
+
+// Shared message handler
+function handleMessage(socket, data) {
+    console.log('Received:', data);
+    switch (data.type) {
+        case 'join_queue':
+            handleJoinQueue(socket);
+            break;
+        case 'leave_queue':
+            handleLeaveQueue(socket);
+            break;
+        case 'create_lobby':
+            handleCreateLobby(socket, data);
+            break;
+        case 'list_lobbies':
+            handleListLobbies(socket);
+            break;
+        case 'join_lobby':
+            handleJoinLobby(socket, data);
+            break;
+        case 'leave_lobby':
+            handleLeaveLobby(socket, data);
+            break;
+        case 'start_game':
+            handleStartGame(socket, data);
+            break;
+        case 'move':
+            handleMove(socket, data);
+            break;
+        default:
+            console.log('Unknown message type:', data.type);
+    }
+}
+
+// --- HTTP + WebSocket server (for Railway) ---
+const httpPort = process.env.PORT || 29801;
+const httpServer = http.createServer((req, res) => {
+    // simple health endpoint and optional debug
+    if (req.url === '/health') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ status: 'ok' }));
+        return;
+    }
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('Chess server running');
+});
+
+const wss = new WebSocket.Server({ noServer: true });
+
+wss.on('connection', (ws, req) => {
+    makeWrapperForWS(ws);
+    clients.add(ws);
+    console.log('New WebSocket client connected', ws.id);
+
+    ws.on('message', (message) => {
+        try {
+            const data = JSON.parse(message.toString());
+            handleMessage(ws, data);
+        } catch (e) { console.error('WS message parse error', e); }
+    });
+
+    ws.on('close', () => {
+        console.log('WS client disconnected', ws.id);
+        clients.delete(ws);
+        handleDisconnect(ws);
+    });
+    ws.on('error', (err) => console.error('WS error', err));
+});
+
+httpServer.on('upgrade', (request, socket, head) => {
+    // handle websocket upgrade
+    wss.handleUpgrade(request, socket, head, (ws) => {
+        wss.emit('connection', ws, request);
+    });
+});
+
+httpServer.listen(httpPort, () => console.log(`HTTP/WebSocket server listening on port ${httpPort}`));
+
+// --- Raw TCP server (kept for Trackmania Net::Socket local testing if desired) ---
+const tcpPort = process.env.TCP_PORT || 29802;
+const tcpServer = net.createServer((socket) => {
     console.log('New TCP client connected');
     socket.id = Math.random().toString(36).substr(2, 9);
     clients.add(socket);
@@ -27,35 +131,7 @@ const server = net.createServer((socket) => {
             if (line.length === 0) continue;
             try {
                 const data = JSON.parse(line);
-                console.log('Received:', data);
-                switch (data.type) {
-                    case 'join_queue':
-                        handleJoinQueue(socket);
-                        break;
-                    case 'leave_queue':
-                        handleLeaveQueue(socket);
-                        break;
-                    case 'create_lobby':
-                        handleCreateLobby(socket, data);
-                        break;
-                    case 'list_lobbies':
-                        handleListLobbies(socket);
-                        break;
-                    case 'join_lobby':
-                        handleJoinLobby(socket, data);
-                        break;
-                    case 'leave_lobby':
-                        handleLeaveLobby(socket, data);
-                        break;
-                    case 'start_game':
-                        handleStartGame(socket, data);
-                        break;
-                    case 'move':
-                        handleMove(socket, data);
-                        break;
-                    default:
-                        console.log('Unknown message type:', data.type);
-                }
+                handleMessage(socket, data);
             } catch (error) {
                 console.error('Error handling message:', error);
             }
@@ -73,7 +149,7 @@ const server = net.createServer((socket) => {
     });
 });
 
-server.listen(29801, () => console.log('TCP server listening on port 29801'));
+tcpServer.listen(tcpPort, () => console.log(`TCP server listening on port ${tcpPort}`));
 
 function handleJoinQueue(socket) {
     console.log(`Player ${socket.id} joined queue`);
@@ -104,19 +180,19 @@ function createGame(player1, player2) {
     });
     
     // Notify players
-    player1.write(JSON.stringify({
+    sendToClient(player1, {
         type: 'game_start',
         gameId: gameId,
         isWhite: true,
         opponentId: player2.id
-    }) + "\n");
+    });
 
-    player2.write(JSON.stringify({
+    sendToClient(player2, {
         type: 'game_start',
         gameId: gameId,
         isWhite: false,
         opponentId: player1.id
-    }) + "\n");
+    });
 }
 
 // LOBBY HANDLERS
@@ -135,7 +211,7 @@ function handleCreateLobby(socket, data) {
     lobbies.set(lobbyId, lobby);
 
     // notify creator
-    socket.write(JSON.stringify({ type: 'lobby_created', lobbyId: lobbyId }) + "\n");
+    sendToClient(socket, { type: 'lobby_created', lobbyId: lobbyId });
 
     // broadcast updated lobby list to all connected clients
     console.log(`Lobby ${lobbyId} created. Total lobbies: ${lobbies.size}`);
@@ -154,7 +230,7 @@ function handleListLobbies(socket) {
             playerNames: l.playerNames
         });
     }
-    socket.write(JSON.stringify({ type: 'lobby_list', lobbies: list }) + "\n");
+    sendToClient(socket, { type: 'lobby_list', lobbies: list });
 }
 
 function handleJoinLobby(socket, data) {
@@ -162,15 +238,15 @@ function handleJoinLobby(socket, data) {
     const lobby = lobbies.get(id);
     if (!lobby) {
         console.log(`handleJoinLobby: lobby ${id} not found for ${socket.id}`);
-        socket.write(JSON.stringify({ type: 'lobby_error', message: 'Lobby not found' }) + "\n");
+        sendToClient(socket, { type: 'lobby_error', message: 'Lobby not found' });
         return;
     }
     if (!lobby.open) {
-        socket.write(JSON.stringify({ type: 'lobby_error', message: 'Lobby closed' }) + "\n");
+        sendToClient(socket, { type: 'lobby_error', message: 'Lobby closed' });
         return;
     }
     if (lobby.password && lobby.password !== data.password) {
-        socket.write(JSON.stringify({ type: 'lobby_error', message: 'Incorrect password' }) + "\n");
+        sendToClient(socket, { type: 'lobby_error', message: 'Incorrect password' });
         return;
     }
     if (lobby.players.find(p => p === socket)) {
@@ -187,14 +263,14 @@ function handleJoinLobby(socket, data) {
 
     // notify all players in lobby
     for (const p of lobby.players) {
-        p.write(JSON.stringify({ 
-            type: 'lobby_update', 
-            lobbyId: id, 
-            players: lobby.players.map(x => x.id), 
+        sendToClient(p, {
+            type: 'lobby_update',
+            lobbyId: id,
+            players: lobby.players.map(x => x.id),
             playerNames: lobby.playerNames,
             hostId: lobby.host.id,
-            password: lobby.password 
-        }) + "\n");
+            password: lobby.password
+        });
     }
 
     // broadcast lobby list to everyone
@@ -216,14 +292,14 @@ function handleLeaveLobby(socket, data) {
         }
         lobby.open = lobby.players.length < 2;
         for (const p of lobby.players) {
-            p.write(JSON.stringify({ 
-                type: 'lobby_update', 
-                lobbyId: id, 
-                players: lobby.players.map(x => x.id), 
+            sendToClient(p, {
+                type: 'lobby_update',
+                lobbyId: id,
+                players: lobby.players.map(x => x.id),
                 playerNames: lobby.playerNames,
                 hostId: lobby.host.id,
                 password: lobby.password
-            }) + "\n");
+            });
         }
     }
     broadcastLobbyList();
@@ -244,8 +320,8 @@ function handleStartGame(socket, data) {
     games.set(gameId, { white: p1, black: p2, state: 'playing' });
 
     // notify players
-    p1.write(JSON.stringify({ type: 'game_start', gameId: gameId, isWhite: true, opponentId: p2.id }) + "\n");
-    p2.write(JSON.stringify({ type: 'game_start', gameId: gameId, isWhite: false, opponentId: p1.id }) + "\n");
+    sendToClient(p1, { type: 'game_start', gameId: gameId, isWhite: true, opponentId: p2.id });
+    sendToClient(p2, { type: 'game_start', gameId: gameId, isWhite: false, opponentId: p1.id });
 
     // remove lobby
     lobbies.delete(id);
@@ -265,9 +341,9 @@ function broadcastLobbyList() {
             playerNames: l.playerNames
         });
     }
-    const msg = JSON.stringify({ type: 'lobby_list', lobbies: list }) + "\n";
+    const msgObj = { type: 'lobby_list', lobbies: list };
     clients.forEach(c => {
-        try { c.write(msg); } catch (e) { console.log('Failed to write to client', e); }
+        try { sendToClient(c, msgObj); } catch (e) { console.log('Failed to write to client', e); }
     });
 }
 
@@ -280,13 +356,13 @@ function handleMove(socket, data) {
     
     console.log(`Move in game ${data.gameId} by ${socket.id}`);
     const opponent = game.white === socket ? game.black : game.white;
-    opponent.write(JSON.stringify({
+    sendToClient(opponent, {
         type: 'move',
         fromRow: data.fromRow,
         fromCol: data.fromCol,
         toRow: data.toRow,
         toCol: data.toCol
-    }) + "\n");
+    });
 }
 
 function handleDisconnect(socket) {
@@ -297,14 +373,14 @@ function handleDisconnect(socket) {
         if (game.white === socket || game.black === socket) {
             const opponent = game.white === socket ? game.black : game.white;
             console.log(`Game ${gameId} ended due to disconnect of ${socket.id}`);
-            opponent.write(JSON.stringify({
+            sendToClient(opponent, {
                 type: 'game_over',
                 reason: 'disconnect',
                 winner: game.white === socket ? 'black' : 'white'
-            }) + "\n");
+            });
             games.delete(gameId);
         }
     }
 }
 
-console.log('Chess server listening on port 29801');
+console.log(`Chess server initialized (httpPort=${httpPort}, tcpPort=${tcpPort})`);
