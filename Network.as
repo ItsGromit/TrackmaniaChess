@@ -6,8 +6,10 @@ namespace Network {
     // If Railway exposes TCP for your project, you can point the plugin at that host:port.
     // Otherwise run the server on a host that exposes raw TCP (VPS, cloud VM) and change
     // these values accordingly.
-    string serverHost = "trackmaniachess.up.railway.app"; // change to your server host when deploying
-    int serverPort = 29802; // matches server's TCP listener (TCP_PORT)
+    // Default to the Railway deployment host and port used in your deployment logs.
+    // Change these values if you host elsewhere or for local testing (127.0.0.1).
+    string serverHost = "trackmaniachess.up.railway.app"; // Railway host (change if different)
+    int serverPort = 8080; // Railway injected PORT (logs showed 8080)
     bool isConnected = false;
     string playerId;
     string opponentId;
