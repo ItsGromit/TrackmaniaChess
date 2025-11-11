@@ -3,6 +3,7 @@ namespace Lobby {
     string createLobbyRoomCode = "";
     string joinLobbyPassword = "";
     string selectedLobbyId = "";
+    string password = "*";
 
     void RenderCreateLobby() {
         UI::Text("Create New Lobby");

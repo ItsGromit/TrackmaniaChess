@@ -29,11 +29,8 @@ namespace GameManager {
         // Reset other game state as needed
     }
 
-    void OnOpponentMove(Move@ move) {
-        if (!isLocalPlayerTurn()) {
-            // Apply opponent's move to the local board using global MakeMove
-            MakeMove(move.fromRow, move.fromCol, move.toRow, move.toCol);
-        }
+    void OnOpponentMove(Move@ m) {
+
     }
 
     void OnGameOver(const string &in winner) {

@@ -1,332 +1,211 @@
+// server.js (authoritative, raw TCP, NDJSON protocol)
 const net = require('net');
+const { Chess } = require('chess.js');
 
-const games = new Map(); // gameId -> {white: socket, black: socket, state: boardState}
-const queue = []; // (deprecated) kept for backward compat
+// ---------- State ----------
+const games = new Map();     // gameId -> { white:Socket, black:Socket, chess:Chess, createdAt:number }
+const lobbies = new Map();   // lobbyId -> { id, host:Socket, players:Socket[], playerNames:string[], password:string, open:boolean }
+const clients = new Set();   // connected sockets
 
-// Lobby system
-const lobbies = new Map(); // lobbyId -> {id, host, players: [socket], open}
-
-// Track connected plain TCP clients
-const clients = new Set();
-
-// Helper to normalize send for different socket types (primarily TCP in this build)
-
-function sendToClient(c, obj) {
-    // TCP sockets use write(), ws uses send()
-    if (!c) return;
-    if (typeof c.write === 'function') {
-        // TCP: append newline
-        try { c.write(JSON.stringify(obj) + "\n"); } catch (e) { console.error('TCP write error', e); }
-    } else if (typeof c.send === 'function') {
-        try { c.send(JSON.stringify(obj)); } catch (e) { console.error('WS send error', e); }
-    } else if (typeof c.sendJson === 'function') {
-        c.sendJson(obj);
-    }
+// ---------- Utils ----------
+function send(c, obj) {
+  if (!c) return;
+  try { c.write(JSON.stringify(obj) + '\n'); } catch (e) { console.error('write error', e); }
 }
-
-// Shared message handler
-function handleMessage(socket, data) {
-    console.log('Received:', data);
-    switch (data.type) {
-        case 'join_queue':
-            handleJoinQueue(socket);
-            break;
-        case 'leave_queue':
-            handleLeaveQueue(socket);
-            break;
-        case 'create_lobby':
-            handleCreateLobby(socket, data);
-            break;
-        case 'list_lobbies':
-            handleListLobbies(socket);
-            break;
-        case 'join_lobby':
-            handleJoinLobby(socket, data);
-            break;
-        case 'leave_lobby':
-            handleLeaveLobby(socket, data);
-            break;
-        case 'start_game':
-            handleStartGame(socket, data);
-            break;
-        case 'move':
-            handleMove(socket, data);
-            break;
-        default:
-            console.log('Unknown message type:', data.type);
-    }
+function broadcastPlayers(game, obj) {
+  if (game.white) send(game.white, obj);
+  if (game.black) send(game.black, obj);
 }
+function toAlgebra(s) { return s && typeof s === 'string' ? s : null; }
 
-// Single TCP server (Railway can set PORT for TCP if supported)
-const port = process.env.PORT || process.env.TCP_PORT || 29802;
-const tcpServer = net.createServer((socket) => {
-    console.log('New TCP client connected');
-    socket.id = Math.random().toString(36).substr(2, 9);
-    clients.add(socket);
-    socket.setEncoding('utf8');
-
-    // buffer to accumulate data until newline
-    let buffer = '';
-
-    socket.on('data', (chunk) => {
-        buffer += chunk;
-        let idx;
-        while ((idx = buffer.indexOf('\n')) !== -1) {
-            const line = buffer.slice(0, idx).trim();
-            buffer = buffer.slice(idx + 1);
-            if (line.length === 0) continue;
-            try {
-                const data = JSON.parse(line);
-                handleMessage(socket, data);
-            } catch (error) {
-                console.error('Error handling message:', error);
-            }
+// ---------- Message Handling ----------
+function onMessage(socket, msg) {
+  const { type } = msg || {};
+  switch (type) {
+    // ----- Lobby flows -----
+    case 'create_lobby': {
+      const id = (msg.roomCode || Math.random().toString(36).slice(2, 6)).toUpperCase();
+      const lobby = { id, host: socket, players: [socket], playerNames: [msg.playerName || socket.id], password: msg.password || "", open: true };
+      lobbies.set(id, lobby);
+      send(socket, { type: 'lobby_created', lobbyId: id });
+      broadcastLobbyList();
+      break;
+    }
+    case 'list_lobbies': {
+      send(socket, { type: 'lobby_list', lobbies: lobbyList() });
+      break;
+    }
+    case 'join_lobby': {
+      const l = lobbies.get(msg.lobbyId);
+      if (!l) return send(socket, { type: 'lobby_error', message: 'Lobby not found' });
+      if (!l.open) return send(socket, { type: 'lobby_error', message: 'Lobby closed' });
+      if (l.password && l.password !== (msg.password || "")) return send(socket, { type: 'lobby_error', message: 'Incorrect password' });
+      if (!l.players.includes(socket)) {
+        l.players.push(socket);
+        l.playerNames.push(msg.playerName || socket.id);
+      }
+      l.open = l.players.length < 2;
+      // notify lobby members
+      for (const p of l.players) {
+        send(p, { type: 'lobby_update', lobbyId: l.id, players: l.players.map(x => x.id), playerNames: l.playerNames, hostId: l.host.id, password: !!l.password });
+      }
+      broadcastLobbyList();
+      break;
+    }
+    case 'leave_lobby': {
+      const l = lobbies.get(msg.lobbyId);
+      if (!l) return;
+      l.players = l.players.filter(p => p !== socket);
+      l.playerNames = l.playerNames.filter((_, i) => l.players[i] != null);
+      if (l.players.length === 0) {
+        lobbies.delete(l.id);
+      } else {
+        if (l.host === socket) l.host = l.players[0];
+        l.open = l.players.length < 2;
+        for (const p of l.players) {
+          send(p, { type: 'lobby_update', lobbyId: l.id, players: l.players.map(x => x.id), playerNames: l.playerNames, hostId: l.host.id, password: !!l.password });
         }
-    });
+      }
+      broadcastLobbyList();
+      break;
+    }
+    case 'start_game': {
+      const l = lobbies.get(msg.lobbyId);
+      if (!l) return;
+      if (l.host !== socket) return;         // only host can start
+      if (l.players.length < 2) return;      // need 2 players
+      const p1 = l.players[0], p2 = l.players[1];
+      const gameId = Math.random().toString(36).slice(2, 9);
+      const chess = new Chess();
+      const game = { white: p1, black: p2, chess, createdAt: Date.now() };
+      games.set(gameId, game);
 
-    socket.on('close', () => {
-        console.log('Client disconnected', socket.id);
-        clients.delete(socket);
-        handleDisconnect(socket);
-    });
+      send(p1, { type: 'game_start', gameId, isWhite: true, opponentId: p2.id, fen: chess.fen(), turn: 'w' });
+      send(p2, { type: 'game_start', gameId, isWhite: false, opponentId: p1.id, fen: chess.fen(), turn: 'w' });
 
-    socket.on('error', (err) => {
-        console.log('Socket error', err);
-    });
+      lobbies.delete(l.id);
+      broadcastLobbyList();
+      break;
+    }
+
+    // ----- Gameplay -----
+    case 'move': {
+      const game = games.get(msg.gameId);
+      if (!game) return send(socket, { type: 'error', code: 'GAME_NOT_FOUND' });
+
+      const turnColor = game.chess.turn(); // 'w' | 'b'
+      const seat = (socket === game.white) ? 'w' : (socket === game.black ? 'b' : null);
+      if (seat == null) return send(socket, { type: 'error', code: 'NOT_IN_GAME' });
+      if (seat !== turnColor) return send(socket, { type: 'error', code: 'NOT_YOUR_TURN' });
+
+      // Accept algebraic squares (recommended). Example: from:'e2', to:'e4'
+      const from = toAlgebra(msg.from);
+      const to = toAlgebra(msg.to);
+      const promotion = msg.promo || 'q';
+
+      const res = game.chess.move({ from, to, promotion });
+      if (!res) return send(socket, { type: 'error', code: 'ILLEGAL_MOVE' });
+
+      const fen = game.chess.fen();
+      const nextTurn = game.chess.turn();
+      broadcastPlayers(game, { type: 'moved', gameId: msg.gameId, from, to, san: res.san, fen, turn: nextTurn });
+
+      if (game.chess.isGameOver()) {
+        let reason = 'draw', winner = null;
+        if (game.chess.isCheckmate()) { reason = 'checkmate'; winner = (nextTurn === 'w' ? 'black' : 'white'); }
+        else if (game.chess.isStalemate()) reason = 'stalemate';
+        else if (game.chess.isThreefoldRepetition()) reason = 'threefold';
+        else if (game.chess.isInsufficientMaterial()) reason = 'insufficient';
+        broadcastPlayers(game, { type: 'game_over', gameId: msg.gameId, reason, winner });
+        games.delete(msg.gameId);
+      }
+      break;
+    }
+
+    case 'resign': {
+      const game = games.get(msg.gameId);
+      if (!game) return;
+      const winner = (socket === game.white) ? 'black' : 'white';
+      broadcastPlayers(game, { type: 'game_over', gameId: msg.gameId, reason: 'resign', winner });
+      games.delete(msg.gameId);
+      break;
+    }
+
+    default:
+      send(socket, { type: 'error', code: 'UNKNOWN_TYPE', seen: type });
+  }
+}
+
+// ---------- TCP server / NDJSON framing ----------
+const PORT = process.env.PORT || process.env.TCP_PORT || 29802; // Railway often injects PORT
+const server = net.createServer((socket) => {
+  socket.id = Math.random().toString(36).slice(2, 9);
+  socket.setEncoding('utf8');
+  clients.add(socket);
+
+  let buf = '';
+  socket.on('data', (chunk) => {
+    buf += chunk;
+    let idx;
+    while ((idx = buf.indexOf('\n')) !== -1) {
+      const line = buf.slice(0, idx).trim();
+      buf = buf.slice(idx + 1);
+      if (!line) continue;
+      try { onMessage(socket, JSON.parse(line)); }
+      catch (e) { send(socket, { type: 'error', code: 'BAD_JSON' }); }
+    }
+  });
+
+  socket.on('close', () => {
+    clients.delete(socket);
+    cleanupOnDisconnect(socket);
+  });
+
+  socket.on('error', (e) => {
+    clients.delete(socket);
+    cleanupOnDisconnect(socket);
+  });
+
+  // immediate hello optional
+  send(socket, { type: 'hello', id: socket.id });
 });
 
-tcpServer.listen(port, () => console.log(`TCP server listening on port ${port}`));
+server.listen(PORT, () => {
+  console.log(`Authoritative TCP chess server listening on ${PORT}`);
+});
 
-function handleJoinQueue(socket) {
-    console.log(`Player ${socket.id} joined queue`);
-    queue.push(socket);
-    if (queue.length >= 2) {
-        const player1 = queue.shift();
-        const player2 = queue.shift();
-        createGame(player1, player2);
-    }
+// ---------- Helpers ----------
+function lobbyList() {
+  const list = [];
+  for (const [id, l] of lobbies.entries()) {
+    list.push({ id, hostId: l.host.id, players: l.players.length, open: l.open, hasPassword: !!l.password, playerNames: l.playerNames });
+  }
+  return list;
 }
-
-function handleLeaveQueue(socket) {
-    const index = queue.indexOf(socket);
-    if (index > -1) {
-        queue.splice(index, 1);
-        console.log(`Player ${socket.id} left queue`);
-    }
-}
-
-function createGame(player1, player2) {
-    const gameId = Math.random().toString(36).substr(2, 9);
-    console.log(`Creating game ${gameId} between ${player1.id} and ${player2.id}`);
-    
-    games.set(gameId, {
-        white: player1,
-        black: player2,
-        state: 'playing'
-    });
-    
-    // Notify players
-    sendToClient(player1, {
-        type: 'game_start',
-        gameId: gameId,
-        isWhite: true,
-        opponentId: player2.id
-    });
-
-    sendToClient(player2, {
-        type: 'game_start',
-        gameId: gameId,
-        isWhite: false,
-        opponentId: player1.id
-    });
-}
-
-// LOBBY HANDLERS
-function handleCreateLobby(socket, data) {
-    const lobbyId = data.roomCode || Math.random().toString(36).substr(2, 6).toUpperCase();
-    console.log(`handleCreateLobby: received create_lobby from ${socket.id} data=${JSON.stringify(data)}`);
-    console.log(`Creating lobby ${lobbyId} for ${socket.id}`);
-    const lobby = {
-        id: lobbyId,
-        host: socket,
-        players: [socket],
-        playerNames: [data.playerName || socket.id],
-        password: data.password || "",
-        open: true
-    };
-    lobbies.set(lobbyId, lobby);
-
-    // notify creator
-    sendToClient(socket, { type: 'lobby_created', lobbyId: lobbyId });
-
-    // broadcast updated lobby list to all connected clients
-    console.log(`Lobby ${lobbyId} created. Total lobbies: ${lobbies.size}`);
-    broadcastLobbyList();
-}
-
-function handleListLobbies(socket) {
-    const list = [];
-    for (const [id, l] of lobbies.entries()) {
-        list.push({ 
-            id: id, 
-            hostId: l.host.id, 
-            players: l.players.length, 
-            open: l.open,
-            hasPassword: !!l.password,
-            playerNames: l.playerNames
-        });
-    }
-    sendToClient(socket, { type: 'lobby_list', lobbies: list });
-}
-
-function handleJoinLobby(socket, data) {
-    const id = data.lobbyId;
-    const lobby = lobbies.get(id);
-    if (!lobby) {
-        console.log(`handleJoinLobby: lobby ${id} not found for ${socket.id}`);
-        sendToClient(socket, { type: 'lobby_error', message: 'Lobby not found' });
-        return;
-    }
-    if (!lobby.open) {
-        sendToClient(socket, { type: 'lobby_error', message: 'Lobby closed' });
-        return;
-    }
-    if (lobby.password && lobby.password !== data.password) {
-        sendToClient(socket, { type: 'lobby_error', message: 'Incorrect password' });
-        return;
-    }
-    if (lobby.players.find(p => p === socket)) {
-        // already in lobby
-        console.log(`handleJoinLobby: ${socket.id} already in lobby ${id}`);
-    } else {
-        lobby.players.push(socket);
-        lobby.playerNames.push(data.playerName || socket.id);
-        console.log(`handleJoinLobby: ${socket.id} joined lobby ${id}. players=${lobby.players.map(p=>p.id)}`);
-    }
-
-    // if lobby full (2 players) close it to new joiners
-    if (lobby.players.length >= 2) lobby.open = false;
-
-    // notify all players in lobby
-    for (const p of lobby.players) {
-        sendToClient(p, {
-            type: 'lobby_update',
-            lobbyId: id,
-            players: lobby.players.map(x => x.id),
-            playerNames: lobby.playerNames,
-            hostId: lobby.host.id,
-            password: lobby.password
-        });
-    }
-
-    // broadcast lobby list to everyone
-    broadcastLobbyList();
-}
-
-function handleLeaveLobby(socket, data) {
-    const id = data.lobbyId;
-    const lobby = lobbies.get(id);
-    if (!lobby) return;
-    // remove player
-    lobby.players = lobby.players.filter(p => p !== socket);
-    if (lobby.players.length === 0) {
-        lobbies.delete(id);
-    } else {
-        // if host left, promote another
-        if (lobby.host === socket) {
-            lobby.host = lobby.players[0];
-        }
-        lobby.open = lobby.players.length < 2;
-        for (const p of lobby.players) {
-            sendToClient(p, {
-                type: 'lobby_update',
-                lobbyId: id,
-                players: lobby.players.map(x => x.id),
-                playerNames: lobby.playerNames,
-                hostId: lobby.host.id,
-                password: lobby.password
-            });
-        }
-    }
-    broadcastLobbyList();
-}
-
-function handleStartGame(socket, data) {
-    const id = data.lobbyId;
-    const lobby = lobbies.get(id);
-    if (!lobby) return;
-    if (lobby.host !== socket) return; // only host can start
-    if (lobby.players.length < 2) return; // need 2 players
-
-    console.log(`handleStartGame: host ${socket.id} starting game for lobby ${id} with players ${lobby.players.map(p=>p.id)}`);
-    // create a game between first two players
-    const p1 = lobby.players[0];
-    const p2 = lobby.players[1];
-    const gameId = Math.random().toString(36).substr(2, 9);
-    games.set(gameId, { white: p1, black: p2, state: 'playing' });
-
-    // notify players
-    sendToClient(p1, { type: 'game_start', gameId: gameId, isWhite: true, opponentId: p2.id });
-    sendToClient(p2, { type: 'game_start', gameId: gameId, isWhite: false, opponentId: p1.id });
-
-    // remove lobby
-    lobbies.delete(id);
-    console.log(`Game ${gameId} created for lobby ${id}. lobbies remaining: ${lobbies.size}`);
-    broadcastLobbyList();
-}
-
 function broadcastLobbyList() {
-    const list = [];
-    for (const [id, l] of lobbies.entries()) {
-        list.push({ 
-            id: id, 
-            hostId: l.host.id, 
-            players: l.players.length, 
-            open: l.open,
-            hasPassword: !!l.password,
-            playerNames: l.playerNames
-        });
-    }
-    const msgObj = { type: 'lobby_list', lobbies: list };
-    clients.forEach(c => {
-        try { sendToClient(c, msgObj); } catch (e) { console.log('Failed to write to client', e); }
-    });
+  const msg = { type: 'lobby_list', lobbies: lobbyList() };
+  for (const c of clients) send(c, msg);
 }
-
-function handleMove(socket, data) {
-    const game = games.get(data.gameId);
-    if (!game) {
-        console.log(`Game ${data.gameId} not found`);
-        return;
+function cleanupOnDisconnect(sock) {
+  // remove from lobbies
+  for (const [id, l] of [...lobbies.entries()]) {
+    if (l.players.includes(sock)) {
+      l.players = l.players.filter(p => p !== sock);
+      l.playerNames = l.playerNames.filter((_, i) => l.players[i] != null);
+      if (l.players.length === 0) lobbies.delete(id);
+      else {
+        if (l.host === sock) l.host = l.players[0];
+        l.open = l.players.length < 2;
+        for (const p of l.players) send(p, { type: 'lobby_update', lobbyId: l.id, players: l.players.map(x => x.id), playerNames: l.playerNames, hostId: l.host.id, password: !!l.password });
+      }
     }
-    
-    console.log(`Move in game ${data.gameId} by ${socket.id}`);
-    const opponent = game.white === socket ? game.black : game.white;
-    sendToClient(opponent, {
-        type: 'move',
-        fromRow: data.fromRow,
-        fromCol: data.fromCol,
-        toRow: data.toRow,
-        toCol: data.toCol
-    });
-}
-
-function handleDisconnect(socket) {
-    handleLeaveQueue(socket);
-    
-    // Find and end any active games
-    for (const [gameId, game] of games.entries()) {
-        if (game.white === socket || game.black === socket) {
-            const opponent = game.white === socket ? game.black : game.white;
-            console.log(`Game ${gameId} ended due to disconnect of ${socket.id}`);
-            sendToClient(opponent, {
-                type: 'game_over',
-                reason: 'disconnect',
-                winner: game.white === socket ? 'black' : 'white'
-            });
-            games.delete(gameId);
-        }
+  }
+  // end any games they’re in
+  for (const [gid, g] of [...games.entries()]) {
+    if (g.white === sock || g.black === sock) {
+      const winner = (g.white === sock) ? 'black' : 'white';
+      broadcastPlayers(g, { type: 'game_over', gameId: gid, reason: 'disconnect', winner });
+      games.delete(gid);
     }
+  }
 }
-
-console.log(`Chess server initialized (port=${port})`);
