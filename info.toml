@@ -5,3 +5,6 @@ author = "ItsGromit"
 category = "Game"
 version = "0.1"
 siteid = ""
+
+[package]
+files = ["assets/**"]

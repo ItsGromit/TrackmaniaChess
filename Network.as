@@ -9,7 +9,7 @@ namespace Network {
     // Default to the Railway deployment host and port used in your deployment logs.
     // Change these values if you host elsewhere or for local testing (127.0.0.1).
     string serverHost = "trackmaniachess.up.railway.app"; // Railway host (change if different)
-    int serverPort = 8080; // Railway injected PORT (logs showed 8080)
+    int serverPort = 29801; // Railway injected PORT (logs showed 8080)
     bool isConnected = false;
     string playerId;
     string opponentId;

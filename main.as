@@ -1,5 +1,5 @@
-﻿
-ChessBoardSetup chessBoard = ChessBoardSetup();
+﻿ChessBoardSetup chessBoard;
+PieceAssets pAssets;
 
 bool showWindow = true;
 // UI overrides for network host/port
@@ -29,8 +29,19 @@ void Update(float dt) {
     Network::Update();
 }
 
+bool gPiecesLoaded = false;
+
+void EnsurePieceAssetsLoaded() {
+    if (!gPiecesLoaded) {
+        LoadPieceAssets();
+        gPiecesLoaded = true;
+    }
+}
+
 void Render() {
     if (!showWindow) return;
+
+    EnsurePieceAssetsLoaded();
     
     UI::SetNextWindowSize(600, 680, UI::Cond::FirstUseEver);
     if (UI::Begin("Chess Online", showWindow)) {
@@ -148,7 +159,7 @@ void Render() {
                 
                 // Square color
                 bool isLight = (row + col) % 2 == 0;
-                vec4 squareColor = isLight ? vec4(0.9, 0.9, 0.8, 1) : vec4(0.5, 0.4, 0.3, 1);
+                vec4 squareColor = isLight ? vec4(0.9, 0.9, 0.8, 0.4) : vec4(0.5, 0.4, 0.3, 0.4);
                 
                 // Highlight selected square
                 if (selectedRow == row && selectedCol == col) {
@@ -168,7 +179,7 @@ void Render() {
                         board[row][col] = temp;
                         
                         if (!wouldBeInCheck) {
-                            squareColor = vec4(0.7, 0.9, 0.7, 1);
+                            squareColor = vec4(0.7, 0.9, 0.7, 0.4);
                         }
                     }
                 }
@@ -177,13 +188,13 @@ void Render() {
                 UI::PushStyleColor(UI::Col::ButtonHovered, squareColor * 1.1f);
                 UI::PushStyleColor(UI::Col::ButtonActive, squareColor * 0.9f);
                 
-                string pieceText = GetPieceUnicode(board[row][col]);
-                
-                if (UI::Button(pieceText + "##" + row + "_" + col, vec2(squareSize, squareSize))) {
-                    if (!gameOver) {
-                        HandleSquareClick(row, col);
-                    }
-                }
+                // 1) Button for the square (for clicks)
+                bool clicked = UI::Button("##" + row + "_" + col, vec2(squareSize, squareSize));
+                if (clicked && !gameOver) HandleSquareClick(row, col);
+
+                // 2) Overlay the piece texture using the window draw list (on top of the button)
+                UI::Texture@ tex = GetPieceTexture(chessBoard.board[row][col]);
+                chessBoard.DrawCenteredImageOverLastItem(tex, 6.0f);
                 
                 UI::PopStyleColor(3);
                 
