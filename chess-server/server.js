@@ -1,23 +1,90 @@
-// server.js (authoritative, raw TCP, NDJSON protocol)
+// server.js (authoritative, raw TCP, NDJSON protocol + HTTP /stats over same port)
 const net = require('net');
-const http = require('http');
 const { Chess } = require('chess.js');
 
 // ---------- State ----------
 const games = new Map();     // gameId -> { white:Socket, black:Socket, chess:Chess, createdAt:number }
 const lobbies = new Map();   // lobbyId -> { id, host:Socket, players:Socket[], playerNames:string[], password:string, open:boolean }
-const clients = new Set();   // connected sockets
+const clients = new Set();   // connected game sockets (not HTTP one-shot probes)
 
 // ---------- Utils ----------
 function send(c, obj) {
   if (!c) return;
   try { c.write(JSON.stringify(obj) + '\n'); } catch (e) { console.error('write error', e); }
 }
+
 function broadcastPlayers(game, obj) {
   if (game.white) send(game.white, obj);
   if (game.black) send(game.black, obj);
 }
+
 function toAlgebra(s) { return s && typeof s === 'string' ? s : null; }
+
+// Build stats object reused by HTTP handler
+function buildStats() {
+  const openLobbies = Array.from(lobbies.values()).filter(l => l.open);
+  return {
+    lobbies: {
+      total: lobbies.size,
+      open: openLobbies.length,
+      inGame: lobbies.size - openLobbies.length
+    },
+    games: {
+      active: games.size
+    },
+    clients: {
+      connected: clients.size
+    },
+    lobbyList: lobbyList()
+  };
+}
+
+// Minimal HTTP response over an existing net.Socket
+function handleHttpRequest(socket, firstChunk) {
+  try {
+    const str = firstChunk.toString('utf8');
+    const firstLine = str.split('\r\n')[0];
+    const parts = firstLine.split(' ');
+    const method = parts[0] || 'GET';
+    const path = parts[1] || '/';
+
+    if (method === 'GET' && (path === '/' || path === '/stats')) {
+      const body = JSON.stringify(buildStats(), null, 2);
+      const headers =
+        'HTTP/1.1 200 OK\r\n' +
+        'Content-Type: application/json\r\n' +
+        `Content-Length: ${Buffer.byteLength(body, 'utf8')}\r\n` +
+        'Access-Control-Allow-Origin: *\r\n' +
+        'Connection: close\r\n' +
+        '\r\n';
+      socket.write(headers + body);
+    } else {
+      const body = JSON.stringify({ error: 'Not found' });
+      const headers =
+        'HTTP/1.1 404 Not Found\r\n' +
+        'Content-Type: application/json\r\n' +
+        `Content-Length: ${Buffer.byteLength(body, 'utf8')}\r\n` +
+        'Access-Control-Allow-Origin: *\r\n' +
+        'Connection: close\r\n' +
+        '\r\n';
+      socket.write(headers + body);
+    }
+  } catch (e) {
+    // best-effort 500
+    try {
+      const body = JSON.stringify({ error: 'internal' });
+      const headers =
+        'HTTP/1.1 500 Internal Server Error\r\n' +
+        'Content-Type: application/json\r\n' +
+        `Content-Length: ${Buffer.byteLength(body, 'utf8')}\r\n` +
+        'Connection: close\r\n' +
+        '\r\n';
+      socket.write(headers + body);
+    } catch (_) {}
+  } finally {
+    socket.end();
+  }
+}
 
 // ---------- Message Handling ----------
 function onMessage(socket, msg) {
@@ -39,10 +106,12 @@ function onMessage(socket, msg) {
       broadcastLobbyList();
       break;
     }
+
     case 'list_lobbies': {
       send(socket, { type: 'lobby_list', lobbies: lobbyList() });
       break;
     }
+
     case 'join_lobby': {
       const l = lobbies.get(msg.lobbyId);
       if (!l) return send(socket, { type: 'lobby_error', message: 'Lobby not found' });
@@ -55,7 +124,7 @@ function onMessage(socket, msg) {
         l.playerNames.push(msg.playerName || socket.id);
       }
       l.open = l.players.length < 2;
-      // notify lobby members
+
       for (const p of l.players) {
         send(p, {
           type: 'lobby_update',
@@ -69,6 +138,7 @@ function onMessage(socket, msg) {
       broadcastLobbyList();
       break;
     }
+
     case 'leave_lobby': {
       const l = lobbies.get(msg.lobbyId);
       if (!l) return;
@@ -93,11 +163,12 @@ function onMessage(socket, msg) {
       broadcastLobbyList();
       break;
     }
+
     case 'start_game': {
       const l = lobbies.get(msg.lobbyId);
       if (!l) return;
-      if (l.host !== socket) return;         // only host can start
-      if (l.players.length < 1) return;      // need at least 1 player
+      if (l.host !== socket) return;   // only host can start
+      if (l.players.length < 1) return;
 
       const gameId = Math.random().toString(36).slice(2, 9);
       const chess = new Chess();
@@ -238,18 +309,39 @@ function onMessage(socket, msg) {
   }
 }
 
-// ---------- TCP server / NDJSON framing ----------
-// Use CHESS_TCP_PORT for raw TCP chess traffic (separate from HTTP PORT)
-const TCP_PORT = Number(process.env.CHESS_TCP_PORT || 29802);
+// ---------- TCP server / NDJSON framing + HTTP sniffing ----------
+// Railway will set PORT; fallback to 29802 locally
+const TCP_PORT = Number(process.env.PORT || 29802);
 
 const server = net.createServer((socket) => {
   socket.id = Math.random().toString(36).slice(2, 9);
   socket.setEncoding('utf8');
-  clients.add(socket);
 
   let buf = '';
+  let mode = 'unknown'; // 'http' or 'game'
+
   socket.on('data', (chunk) => {
-    buf += chunk;
+    if (mode === 'unknown') {
+      const str = chunk.toString();
+      // crude HTTP detection
+      if (str.startsWith('GET ') || str.startsWith('HEAD ')) {
+        mode = 'http';
+        handleHttpRequest(socket, str);
+        return;
+      } else {
+        mode = 'game';
+        clients.add(socket);
+        buf += str;
+      }
+    } else if (mode === 'game') {
+      buf += chunk;
+    } else {
+      // already handled HTTP; ignore
+      return;
+    }
+
+    if (mode !== 'game') return;
+
     let idx;
     while ((idx = buf.indexOf('\n')) !== -1) {
       const line = buf.slice(0, idx).trim();
@@ -261,61 +353,26 @@ const server = net.createServer((socket) => {
   });
 
   socket.on('close', () => {
-    clients.delete(socket);
-    cleanupOnDisconnect(socket);
+    if (mode === 'game') {
+      clients.delete(socket);
+      cleanupOnDisconnect(socket);
+    }
   });
 
   socket.on('error', () => {
-    clients.delete(socket);
-    cleanupOnDisconnect(socket);
+    if (mode === 'game') {
+      clients.delete(socket);
+      cleanupOnDisconnect(socket);
+    }
   });
 
+  // For game clients, they'll get this after first NDJSON message.
+  // For HTTP probes, we end the socket inside handleHttpRequest.
   send(socket, { type: 'hello', id: socket.id });
 });
 
-server.on('error', (err) => {
-  console.error('TCP server error:', err);
-  // Let Railway restart the container instead of hot-looping
-  process.exit(1);
-});
-
 server.listen(TCP_PORT, () => {
-  console.log(`Authoritative TCP chess server listening on ${TCP_PORT}`);
-});
-
-// ---------- HTTP Stats Server ----------
-// Railway sets PORT for the HTTP service domain (trackmaniachess.up.railway.app)
-const HTTP_PORT = Number(process.env.PORT || 8080);
-
-const httpServer = http.createServer((req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Content-Type', 'application/json');
-
-  if (req.url === '/stats' || req.url === '/') {
-    const openLobbies = Array.from(lobbies.values()).filter(l => l.open);
-    const stats = {
-      lobbies: {
-        total: lobbies.size,
-        open: openLobbies.length
-      },
-      games: {
-        active: games.size   // <-- "rooms actively running"
-      },
-      clients: {
-        connected: clients.size
-      },
-      lobbyList: lobbyList()
-    };
-    res.writeHead(200);
-    res.end(JSON.stringify(stats, null, 2));
-  } else {
-    res.writeHead(404);
-    res.end(JSON.stringify({ error: 'Not found' }));
-  }
-});
-
-httpServer.listen(HTTP_PORT, () => {
-  console.log(`HTTP stats server listening on ${HTTP_PORT}`);
+  console.log(`Authoritative TCP chess server listening (and HTTP /stats) on ${TCP_PORT}`);
 });
 
 // ---------- Helpers ----------
