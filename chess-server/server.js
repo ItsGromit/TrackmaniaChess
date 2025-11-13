@@ -151,17 +151,36 @@ function onMessage(socket, msg) {
       const newGameId = Math.random().toString(36).slice(2, 9);
       const chess = new Chess();
 
-      // Randomly assign white/black
-      const randomize = Math.random() < 0.5;
-      const newWhite = randomize ? p1 : (p2 || p1);
-      const newBlack = randomize ? (p2 || p1) : p1;
+      let newWhite, newBlack;
 
-      const newGame = { white: newWhite, black: newBlack !== newWhite ? newBlack : null, chess, createdAt: Date.now() };
+      if (p2) {
+        // Two players: randomly swap them
+        const randomize = Math.random() < 0.5;
+        newWhite = randomize ? p1 : p2;
+        newBlack = randomize ? p2 : p1;
+      } else {
+        // Single player: randomly assign them to white or black
+        const assignWhite = Math.random() < 0.5;
+        newWhite = assignWhite ? p1 : null;
+        newBlack = assignWhite ? null : p1;
+        // For single player, they always play as one color, so just randomize which
+        if (assignWhite) {
+          newWhite = p1;
+          newBlack = null;
+        } else {
+          newWhite = null;
+          newBlack = p1;
+        }
+      }
+
+      const newGame = { white: newWhite, black: newBlack, chess, createdAt: Date.now() };
       games.set(newGameId, newGame);
 
-      send(newWhite, { type: 'game_start', gameId: newGameId, isWhite: true, opponentId: newBlack ? newBlack.id : null, fen: chess.fen(), turn: 'w' });
-      if (newBlack && newBlack !== newWhite) {
-        send(newBlack, { type: 'game_start', gameId: newGameId, isWhite: false, opponentId: newWhite.id, fen: chess.fen(), turn: 'w' });
+      if (newWhite) {
+        send(newWhite, { type: 'game_start', gameId: newGameId, isWhite: true, opponentId: newBlack ? newBlack.id : null, fen: chess.fen(), turn: 'w' });
+      }
+      if (newBlack) {
+        send(newBlack, { type: 'game_start', gameId: newGameId, isWhite: false, opponentId: newWhite ? newWhite.id : null, fen: chess.fen(), turn: 'w' });
       }
       break;
     }
