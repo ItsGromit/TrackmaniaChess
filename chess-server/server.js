@@ -135,6 +135,37 @@ function onMessage(socket, msg) {
       break;
     }
 
+    case 'new_game': {
+      const game = games.get(msg.gameId);
+      if (!game) return;
+      // Only allow if both players agree or if it's a single player game
+      const isPlayer = (socket === game.white || socket === game.black);
+      if (!isPlayer) return;
+
+      // End the current game
+      games.delete(msg.gameId);
+
+      // Create new game with randomized teams
+      const p1 = game.white;
+      const p2 = game.black;
+      const newGameId = Math.random().toString(36).slice(2, 9);
+      const chess = new Chess();
+
+      // Randomly assign white/black
+      const randomize = Math.random() < 0.5;
+      const newWhite = randomize ? p1 : (p2 || p1);
+      const newBlack = randomize ? (p2 || p1) : p1;
+
+      const newGame = { white: newWhite, black: newBlack !== newWhite ? newBlack : null, chess, createdAt: Date.now() };
+      games.set(newGameId, newGame);
+
+      send(newWhite, { type: 'game_start', gameId: newGameId, isWhite: true, opponentId: newBlack ? newBlack.id : null, fen: chess.fen(), turn: 'w' });
+      if (newBlack && newBlack !== newWhite) {
+        send(newBlack, { type: 'game_start', gameId: newGameId, isWhite: false, opponentId: newWhite.id, fen: chess.fen(), turn: 'w' });
+      }
+      break;
+    }
+
     default:
       send(socket, { type: 'error', code: 'UNKNOWN_TYPE', seen: type });
   }

@@ -231,22 +231,34 @@ void Render() {
 
             UI::Separator();
 
-            if (UI::Button("New Game")) {
-                chessBoard.InitializeBoard();
-                // re-link globals
-                @board       = chessBoard.GetBoard();
-                currentTurn  = chessBoard.currentTurn;
-                selectedRow  = chessBoard.selectedRow;
-                selectedCol  = chessBoard.selectedCol;
-                moveHistory  = chessBoard.moveHistory;
-                gameOver     = chessBoard.gameOver;
-                gameResult   = chessBoard.gameResult;
-            }
-            
-            UI::SameLine();
-            
-            if (UI::Button("Undo Move") && moveHistory.Length > 0) {
-                UndoLastMove();
+            // Online game buttons
+            if (Network::gameId != "") {
+                if (UI::Button("Forfeit")) {
+                    Network::Resign();
+                }
+                UI::SameLine();
+                if (UI::Button("New Game")) {
+                    Network::RequestNewGame();
+                }
+            } else {
+                // Local game buttons
+                if (UI::Button("New Game")) {
+                    chessBoard.InitializeBoard();
+                    // re-link globals
+                    @board       = chessBoard.GetBoard();
+                    currentTurn  = chessBoard.currentTurn;
+                    selectedRow  = chessBoard.selectedRow;
+                    selectedCol  = chessBoard.selectedCol;
+                    moveHistory  = chessBoard.moveHistory;
+                    gameOver     = chessBoard.gameOver;
+                    gameResult   = chessBoard.gameResult;
+                }
+
+                UI::SameLine();
+
+                if (UI::Button("Undo Move") && moveHistory.Length > 0) {
+                    UndoLastMove();
+                }
             }
             
             // Move history

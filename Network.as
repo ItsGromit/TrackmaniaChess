@@ -153,6 +153,14 @@ namespace Network {
         SendJson(j);
     }
 
+    void RequestNewGame() {
+        if (gameId.Length == 0) return;
+        Json::Value j = Json::Object();
+        j["type"] = "new_game";
+        j["gameId"] = gameId;
+        SendJson(j);
+    }
+
     // ---------- Messages ----------
     void HandleMsg(Json::Value &msg) {
         string t = msg["type"];
