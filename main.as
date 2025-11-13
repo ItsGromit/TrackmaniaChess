@@ -1,8 +1,7 @@
-﻿// --- Keep your existing includes / imports above if any ---
-ChessBoardSetup chessBoard;
+﻿ChessBoardSetup chessBoard;
 PieceAssets pAssets;
 
-bool showWindow = true;
+bool showWindow = false;
 
 // UI overrides for server host/port (kept from your snippet)
 string ui_serverHost = "";
@@ -42,8 +41,16 @@ void EnsurePieceAssetsLoaded() {
     }
 }
 
+void RenderMenu() {
+    if (UI::MenuItem("Chess Race")) {
+        showWindow = !showWindow;
+    }
+}
+
 void Render() {
     if (!showWindow) return;
+
+    
 
     EnsurePieceAssetsLoaded();
     
@@ -54,25 +61,25 @@ void Render() {
                 UI::Text("Chess Online");
                 UI::Separator();
                 // Server override fields
-                UI::Text("Server Host:");
-                UI::SameLine();
-                UI::SetNextItemWidth(250);
-                ui_serverHost = UI::InputText("Host", ui_serverHost);
-                if (ui_serverHost == "") ui_serverHost = Network::serverHost;
+                // UI::Text("Server Host:");
+                // UI::SameLine();
+                // UI::SetNextItemWidth(250);
+                // ui_serverHost = UI::InputText("Host", ui_serverHost);
+                // if (ui_serverHost == "") ui_serverHost = Network::serverHost;
 
-                UI::Text("Server Port:");
-                UI::SameLine();
-                UI::SetNextItemWidth(120);
-                ui_serverPort = UI::InputText("Port", ui_serverPort);
-                if (ui_serverPort == "") ui_serverPort = "" + Network::serverPort;
+                // UI::Text("Server Port:");
+                // UI::SameLine();
+                // UI::SetNextItemWidth(120);
+                // ui_serverPort = UI::InputText("Port", ui_serverPort);
+                // if (ui_serverPort == "") ui_serverPort = "" + Network::serverPort;
 
-                if (UI::Button("Apply Settings")) {
-                    if (ui_serverHost != "") Network::serverHost = ui_serverHost;
-                    if (ui_serverPort != "") {
-                        uint portParsed = Text::ParseUInt(ui_serverPort);
-                        if (portParsed > 0) Network::serverPort = portParsed;
-                    }
-                }
+                // if (UI::Button("Apply Settings")) {
+                //     if (ui_serverHost != "") Network::serverHost = ui_serverHost;
+                //     if (ui_serverPort != "") {
+                //         uint portParsed = Text::ParseUInt(ui_serverPort);
+                //         if (portParsed > 0) Network::serverPort = portParsed;
+                //     }
+                // }
 
                 UI::Separator();
 
@@ -97,19 +104,6 @@ void Render() {
                         Network::ListLobbies();
                     }
                 }
-                
-                if (UI::Button("Play Locally")) {
-                    GameManager::currentState = GameState::Playing;
-                    chessBoard.InitializeBoard();
-                    // re-link globals after local reset
-                    @board       = chessBoard.GetBoard();
-                    currentTurn  = chessBoard.currentTurn;
-                    selectedRow  = chessBoard.selectedRow;
-                    selectedCol  = chessBoard.selectedCol;
-                    moveHistory  = chessBoard.moveHistory;
-                    gameOver     = chessBoard.gameOver;
-                    gameResult   = chessBoard.gameResult;
-                }
                 break;
             }
             
@@ -121,20 +115,25 @@ void Render() {
             case GameState::InQueue: {
                 UI::Text("Online Lobby Browser");
                 UI::Separator();
-                
+
                 // Render create lobby UI (your existing UI module)
                 Lobby::RenderCreateLobby();
 
-                // Show either current lobby or lobby list
-                if (Network::currentLobbyId != "") {
-                    Lobby::RenderCurrentLobby();
-                } else {
-                    Lobby::RenderLobbyList();
-                }
+                // Show lobby list
+                Lobby::RenderLobbyList();
 
                 if (UI::Button("Back to Menu")) {
                     GameManager::currentState = GameState::Menu;
                 }
+                break;
+            }
+
+            case GameState::InLobby: {
+                UI::Text("\\$0f0Lobby Screen");
+                UI::Separator();
+
+                // Render the current lobby details
+                Lobby::RenderCurrentLobby();
                 break;
             }
             
@@ -154,9 +153,6 @@ void Render() {
         
         if (GameManager::currentState == GameState::Playing) {
             // Game info
-            string playerColorText = Network::isWhite ? "\\$fffWhite" : "\\$666Black";
-            UI::Text("Playing as: " + playerColorText);
-            
             string turnText = (currentTurn == PieceColor::White) ? "\\$fffWhite" : "\\$666Black";
             UI::Text("Turn: " + turnText);
             
@@ -228,9 +224,13 @@ void Render() {
             }
             
             UI::SetCursorPos(boardPos + vec2(0, 8 * squareSize + 10));
-            
+
+            // Display player's color prominently at the bottom
+            string colorDisplayText = Network::isWhite ? "\\$fffYou are playing as WHITE" : "\\$666You are playing as BLACK";
+            UI::Text(colorDisplayText);
+
             UI::Separator();
-            
+
             if (UI::Button("New Game")) {
                 chessBoard.InitializeBoard();
                 // re-link globals
@@ -268,8 +268,6 @@ void Render() {
 
 // ------------------------------------------------------------
 // Click handling:
-// - If an ONLINE game is active (Network::gameId != ""), we send algebraic {from,to} to the server.
-// - Otherwise, we forward to your original local handler on ChessBoardSetup.
 // ------------------------------------------------------------
 int gSelR = -1, gSelC = -1;
 

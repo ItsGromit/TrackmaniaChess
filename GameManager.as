@@ -2,6 +2,7 @@ enum GameState {
     Menu,
     Connecting,
     InQueue,
+    InLobby,
     Playing,
     GameOver
 }

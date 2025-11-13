@@ -3,12 +3,12 @@ namespace Lobby {
     string createLobbyRoomCode = "";
     string joinLobbyPassword = "";
     string selectedLobbyId = "";
-    string password = "*";
+    string password = "";
 
     void RenderCreateLobby() {
         UI::Text("Create New Lobby");
         
-        UI::Text("Room code will be randomly generated.");
+        UI::Text("Input a password unless you want random people to join and play you.");
         UI::SetNextItemWidth(200);
         createLobbyPassword = UI::InputText("Password (optional)", createLobbyPassword);
 
@@ -26,12 +26,14 @@ namespace Lobby {
 
     void RenderLobbyList() {
         UI::Text("Available Lobbies:");
-        
+
         for (uint i = 0; i < Network::lobbies.Length; i++) {
             Network::Lobby@ l = Network::lobbies[i];
             if (l.id == Network::currentLobbyId) continue;
-            
-            UI::Text("[" + l.id + "] " + l.hostId + " (" + l.players + ")");
+
+            // Get the host name from playerNames array (host is first player)
+            string hostName = l.playerNames.Length > 0 ? l.playerNames[0] : l.hostId;
+            UI::Text("[" + l.id + "] " + hostName + " (" + l.players + ")");
             UI::SameLine();
             
             if (l.open) {
@@ -91,7 +93,8 @@ namespace Lobby {
             UI::Text("\\$0f0Players in Lobby:");
             for (uint j = 0; j < l.playerNames.Length; j++) {
                 string playerName = l.playerNames[j];
-                if (l.hostId == playerName) {
+                // The first player in the list is the host
+                if (j == 0) {
                     UI::Text("\\$ff0[Host] " + playerName);
                 } else {
                     UI::Text(playerName);
@@ -107,7 +110,7 @@ namespace Lobby {
             }
             if (UI::Button("Leave Lobby")) {
                 Network::LeaveLobby();
-                GameManager::currentState = GameState::Menu;
+                GameManager::currentState = GameState::InQueue;
             }
             break;
         }

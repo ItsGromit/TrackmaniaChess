@@ -3,7 +3,7 @@
 name = "Chess Race Online"
 author = "ItsGromit"
 category = "Game"
-version = "0.1"
+version = "0.2"
 siteid = ""
 
 [package]

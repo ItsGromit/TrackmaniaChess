@@ -73,15 +73,19 @@ function onMessage(socket, msg) {
       const l = lobbies.get(msg.lobbyId);
       if (!l) return;
       if (l.host !== socket) return;         // only host can start
-      if (l.players.length < 2) return;      // need 2 players
-      const p1 = l.players[0], p2 = l.players[1];
+      if (l.players.length < 1) return;      // need at least 1 player
+
       const gameId = Math.random().toString(36).slice(2, 9);
       const chess = new Chess();
+      const p1 = l.players[0];
+      const p2 = l.players.length >= 2 ? l.players[1] : null;
       const game = { white: p1, black: p2, chess, createdAt: Date.now() };
       games.set(gameId, game);
 
-      send(p1, { type: 'game_start', gameId, isWhite: true, opponentId: p2.id, fen: chess.fen(), turn: 'w' });
-      send(p2, { type: 'game_start', gameId, isWhite: false, opponentId: p1.id, fen: chess.fen(), turn: 'w' });
+      send(p1, { type: 'game_start', gameId, isWhite: true, opponentId: p2 ? p2.id : null, fen: chess.fen(), turn: 'w' });
+      if (p2) {
+        send(p2, { type: 'game_start', gameId, isWhite: false, opponentId: p1.id, fen: chess.fen(), turn: 'w' });
+      }
 
       lobbies.delete(l.id);
       broadcastLobbyList();

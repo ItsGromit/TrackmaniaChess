@@ -2,8 +2,8 @@ namespace Network {
     Net::Socket@ sock;
     bool isConnected = false;
 
-    [Setting category="Network" name="Server host"] string serverHost = "127.0.0.1";
-    [Setting category="Network" name="Server port"] uint   serverPort = 29802;
+    [Setting category="Network" name="Server host"] string serverHost = "shortline.proxy.rlwy.net";
+    [Setting category="Network" name="Server port"] uint   serverPort = 37920;
 
     string playerId;
     string currentLobbyId;
@@ -13,6 +13,15 @@ namespace Network {
 
     // file letters (avoid chr())
     const array<string> FILES = {"a","b","c","d","e","f","g","h"};
+
+    // Helper function to get local player's display name
+    string GetLocalPlayerName() {
+        auto app = GetApp();
+        if (app is null) return "Player";
+        auto playerInfo = app.LocalPlayerInfo;
+        if (playerInfo is null) return "Player";
+        return playerInfo.Name;
+    }
 
     class Lobby {
         string id;
@@ -87,7 +96,9 @@ namespace Network {
         j["type"] = "create_lobby";
         if (roomCode.Length > 0) j["roomCode"] = roomCode;
         if (password.Length > 0) j["password"] = password;
-        if (playerName.Length > 0) j["playerName"] = playerName;
+        // Use provided name or get local player name
+        string name = playerName.Length > 0 ? playerName : GetLocalPlayerName();
+        j["playerName"] = name;
         SendJson(j);
     }
 
@@ -97,7 +108,9 @@ namespace Network {
         j["type"] = "join_lobby";
         j["lobbyId"] = lobbyId;
         if (password.Length > 0) j["password"] = password;
-        if (playerName.Length > 0) j["playerName"] = playerName;
+        // Use provided name or get local player name
+        string name = playerName.Length > 0 ? playerName : GetLocalPlayerName();
+        j["playerName"] = name;
         SendJson(j);
     }
 
@@ -171,6 +184,7 @@ namespace Network {
         else if (t == "lobby_created") {
             currentLobbyId = string(msg["lobbyId"]);
             isHost = true;
+            GameManager::currentState = GameState::InLobby;
         }
         else if (t == "lobby_update") {
             string id = string(msg["lobbyId"]);
@@ -178,6 +192,10 @@ namespace Network {
                 currentLobbyId = id;
                 string host = string(msg["hostId"]);
                 isHost = (host == playerId);
+                // Transition to InLobby state when joining
+                if (currentLobbyId.Length > 0 && GameManager::currentState == GameState::InQueue) {
+                    GameManager::currentState = GameState::InLobby;
+                }
             }
         }
         else if (t == "game_start") {
