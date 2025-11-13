@@ -192,7 +192,7 @@ function onMessage(socket, msg) {
 }
 
 // ---------- TCP server / NDJSON framing ----------
-const TCP_PORT = process.env.TCP_PORT || 29801;
+const TCP_PORT = process.env.TCP_PORT || 29802;
 const server = net.createServer((socket) => {
   socket.id = Math.random().toString(36).slice(2, 9);
   socket.setEncoding('utf8');
