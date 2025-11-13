@@ -1,5 +1,6 @@
 // server.js (authoritative, raw TCP, NDJSON protocol)
 const net = require('net');
+const http = require('http');
 const { Chess } = require('chess.js');
 
 // ---------- State ----------
@@ -226,6 +227,41 @@ const server = net.createServer((socket) => {
 
 server.listen(PORT, () => {
   console.log(`Authoritative TCP chess server listening on ${PORT}`);
+});
+
+// ---------- HTTP Stats Server ----------
+const HTTP_PORT = process.env.HTTP_PORT || 8080;
+const httpServer = http.createServer((req, res) => {
+  // Enable CORS for browser access
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Content-Type', 'application/json');
+
+  if (req.url === '/stats' || req.url === '/') {
+    const openLobbies = Array.from(lobbies.values()).filter(l => l.open);
+    const stats = {
+      lobbies: {
+        total: lobbies.size,
+        open: openLobbies.length,
+        inGame: lobbies.size - openLobbies.length
+      },
+      games: {
+        active: games.size
+      },
+      clients: {
+        connected: clients.size
+      },
+      lobbyList: lobbyList()
+    };
+    res.writeHead(200);
+    res.end(JSON.stringify(stats, null, 2));
+  } else {
+    res.writeHead(404);
+    res.end(JSON.stringify({ error: 'Not found' }));
+  }
+});
+
+httpServer.listen(HTTP_PORT, () => {
+  console.log(`HTTP stats server listening on ${HTTP_PORT}`);
 });
 
 // ---------- Helpers ----------
