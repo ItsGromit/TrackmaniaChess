@@ -231,7 +231,7 @@ server.listen(TCP_PORT, () => {
 
 setInterval(() => {
   console.log(`[Stats] Active games: ${games.size}, Open lobbies: ${lobbies.size}, Connected clients: ${clients.size}`);
-}, 5000);
+}, 50000);
 
 // ---------- Helpers ----------
 function lobbyList() {
