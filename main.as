@@ -55,35 +55,13 @@ void Render() {
     EnsurePieceAssetsLoaded();
     
     UI::SetNextWindowSize(600, 680, UI::Cond::FirstUseEver);
-    if (UI::Begin("Chess Online", showWindow)) {
+    if (UI::Begin("Chess Race", showWindow)) {
         switch (GameManager::currentState) {
             case GameState::Menu: {
-                UI::Text("Chess Online");
-                UI::Separator();
-                // Server override fields
-                // UI::Text("Server Host:");
-                // UI::SameLine();
-                // UI::SetNextItemWidth(250);
-                // ui_serverHost = UI::InputText("Host", ui_serverHost);
-                // if (ui_serverHost == "") ui_serverHost = Network::serverHost;
-
-                // UI::Text("Server Port:");
-                // UI::SameLine();
-                // UI::SetNextItemWidth(120);
-                // ui_serverPort = UI::InputText("Port", ui_serverPort);
-                // if (ui_serverPort == "") ui_serverPort = "" + Network::serverPort;
-
-                // if (UI::Button("Apply Settings")) {
-                //     if (ui_serverHost != "") Network::serverHost = ui_serverHost;
-                //     if (ui_serverPort != "") {
-                //         uint portParsed = Text::ParseUInt(ui_serverPort);
-                //         if (portParsed > 0) Network::serverPort = portParsed;
-                //     }
-                // }
-
+                UI::Text("Chess Race");
                 UI::Separator();
 
-                if (UI::Button("Play Online")) {
+                if (UI::Button("Play")) {
                     // Ensure UI overrides are applied
                     if (ui_serverHost != "") Network::serverHost = ui_serverHost;
                     if (ui_serverPort != "") {
@@ -113,7 +91,7 @@ void Render() {
             }
             
             case GameState::InQueue: {
-                UI::Text("Online Lobby Browser");
+                UI::Text("Lobby Browser");
                 UI::Separator();
 
                 // Render create lobby UI (your existing UI module)
@@ -129,7 +107,7 @@ void Render() {
             }
 
             case GameState::InLobby: {
-                UI::Text("\\$0f0Lobby Screen");
+                UI::Text("\\$0f0Lobby");
                 UI::Separator();
 
                 // Render the current lobby details
@@ -158,6 +136,8 @@ void Render() {
             
             if (!GameManager::isLocalPlayerTurn()) {
                 UI::Text("\\$ff0Waiting for opponent's move...");
+            } else {
+                UI::Text("");
             }
             
             if (IsInCheck(currentTurn)) {
@@ -169,46 +149,81 @@ void Render() {
             }
             
             UI::Separator();
-            
-            // Draw chess board (unchanged)
-            float squareSize = 60.0f;
+
+            // Draw chess board
             vec2 boardPos = UI::GetCursorPos();
-            
+
+            // Calculate available space for the board
+            vec2 contentRegion = UI::GetContentRegionAvail();
+
+            // Reserve space for UI elements below the board (buttons, move history, etc.)
+            float reservedHeight = 200.0f;
+            float availableHeight = contentRegion.y - reservedHeight;
+            float availableWidth = contentRegion.x - 20.0f; // Add padding
+
+            // Use the smaller dimension to ensure board fits and remains square
+            float maxBoardSize = Math::Min(availableWidth, availableHeight);
+            // Add a minimum size to prevent the board from becoming too small
+            maxBoardSize = Math::Max(maxBoardSize, 240.0f);
+            // Add a maximum size to prevent the board from becoming too large
+            maxBoardSize = Math::Min(maxBoardSize, 800.0f);
+
+            float squareSize = maxBoardSize / 8.0f;
+
+            // Flip board if playing as black
+            bool flipBoard = (Network::gameId != "" && !Network::isWhite);
+
+            // Set button rounding to 0 for sharp corners
+            UI::PushStyleVar(UI::StyleVar::FrameRounding, 0.0f);
+
             for (int row = 0; row < 8; row++) {
                 for (int col = 0; col < 8; col++) {
-                    UI::SetCursorPos(boardPos + vec2(col * squareSize, row * squareSize));
-                    
+                    // Calculate display position (flip for black player)
+                    int displayRow = flipBoard ? (7 - row) : row;
+                    int displayCol = flipBoard ? (7 - col) : col;
+
+                    UI::SetCursorPos(boardPos + vec2(displayCol * squareSize, displayRow * squareSize));
+
                     // Square color
                     bool isLight = (row + col) % 2 == 0;
                     vec4 squareColor = isLight ? vec4(0.9, 0.9, 0.8, 0.4) : vec4(0.5, 0.4, 0.3, 0.4);
-                    
-                    // Highlight selected square
-                    if (selectedRow == row && selectedCol == col) {
-                        squareColor = vec4(0.3, 0.7, 0.3, 1);
-                    }
-                    
-                    // Highlight valid moves (your existing local preview remains)
-                    if (selectedRow != -1 && selectedCol != -1) {
-                        if (IsValidMove(selectedRow, selectedCol, row, col)) {
-                            Piece temp = board[row][col];
-                            board[row][col] = board[selectedRow][selectedCol];
-                            board[selectedRow][selectedCol] = Piece();
-                            
-                            bool wouldBeInCheck = IsInCheck(currentTurn);
-                            
-                            board[selectedRow][selectedCol] = board[row][col];
-                            board[row][col] = temp;
-                            
-                            if (!wouldBeInCheck) {
-                                squareColor = vec4(0.7, 0.9, 0.7, 0.4);
+
+                    // Only show highlights when it's the player's turn
+                    if (GameManager::isLocalPlayerTurn()) {
+                        // Highlight selected square
+                        if (selectedRow == row && selectedCol == col) {
+                            squareColor = vec4(0.3, 0.7, 0.3, 1);
+                        }
+
+                        // Highlight valid moves (your existing local preview remains)
+                        if (selectedRow != -1 && selectedCol != -1) {
+                            if (IsValidMove(selectedRow, selectedCol, row, col)) {
+                                Piece temp = board[row][col];
+                                board[row][col] = board[selectedRow][selectedCol];
+                                board[selectedRow][selectedCol] = Piece();
+
+                                bool wouldBeInCheck = IsInCheck(currentTurn);
+
+                                board[selectedRow][selectedCol] = board[row][col];
+                                board[row][col] = temp;
+
+                                if (!wouldBeInCheck) {
+                                    squareColor = vec4(0.7, 0.9, 0.7, 0.4);
+                                }
                             }
                         }
                     }
-                    
+
                     UI::PushStyleColor(UI::Col::Button, squareColor);
                     UI::PushStyleColor(UI::Col::ButtonHovered, squareColor * 1.1f);
-                    UI::PushStyleColor(UI::Col::ButtonActive, squareColor * 0.9f);
-                    
+
+                    // Only show click/active effect when it's the player's turn
+                    if (GameManager::isLocalPlayerTurn()) {
+                        UI::PushStyleColor(UI::Col::ButtonActive, squareColor * 0.9f);
+                    } else {
+                        UI::PushStyleColor(UI::Col::ButtonActive, squareColor * 1.1f); // Same as hover
+                    }
+
                     // 1) Button for the square (for clicks)
                     bool clicked = UI::Button("##" + row + "_" + col, vec2(squareSize, squareSize));
                     if (clicked && !gameOver) HandleSquareClick(row, col);
@@ -216,12 +231,15 @@ void Render() {
                     // 2) Overlay the piece texture using the window draw list (on top of the button)
                     UI::Texture@ tex = GetPieceTexture(chessBoard.board[row][col]);
                     chessBoard.DrawCenteredImageOverLastItem(tex, 6.0f);
-                    
+
                     UI::PopStyleColor(3);
-                    
+
                     if (col < 7) UI::SameLine();
                 }
             }
+
+            // Restore button rounding
+            UI::PopStyleVar();
             
             UI::SetCursorPos(boardPos + vec2(0, 8 * squareSize + 10));
 
@@ -286,11 +304,29 @@ int gSelR = -1, gSelC = -1;
 void HandleSquareClick(int row, int col) {
     // ONLINE: authoritative server
     if (GameManager::currentState == GameState::Playing && Network::gameId != "") {
+        // Check if it's the player's turn
+        if (!GameManager::isLocalPlayerTurn()) {
+            return; // Not your turn, ignore clicks
+        }
+
         if (gSelR == -1) {
+            // First click: selecting a piece
+            Piece@ piece = board[row][col];
+            if (piece is null || piece.type == PieceType::Empty) {
+                return; // No piece here, ignore
+            }
+
+            // Check if the piece belongs to the player
+            bool isPieceWhite = (piece.color == PieceColor::White);
+            if (isPieceWhite != Network::isWhite) {
+                return; // Not your piece, ignore
+            }
+
             gSelR = row; gSelC = col;
             selectedRow = row; selectedCol = col;
             return;
         } else {
+            // Second click: attempting to move
             string fromAlg = Network::ToAlg(gSelR, gSelC);
             string toAlg   = Network::ToAlg(row, col);
             Network::SendMove(fromAlg, toAlg);
@@ -302,6 +338,17 @@ void HandleSquareClick(int row, int col) {
 
     // LOCAL: minimal pseudo-legal move (visual only)
     if (gSelR == -1) {
+        // First click: selecting a piece
+        Piece@ piece = board[row][col];
+        if (piece is null || piece.type == PieceType::Empty) {
+            return; // No piece here, ignore
+        }
+
+        // Check if the piece belongs to the current player
+        if (piece.color != currentTurn) {
+            return; // Not the current player's piece, ignore
+        }
+
         gSelR = row; gSelC = col;
         selectedRow = row; selectedCol = col;
         return;

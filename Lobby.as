@@ -6,14 +6,13 @@ namespace Lobby {
     string password = "";
 
     void RenderCreateLobby() {
-        UI::Text("Create New Lobby");
+        UI::Text("Create Room");
         
         UI::Text("Input a password unless you want random people to join and play you.");
         UI::SetNextItemWidth(200);
         createLobbyPassword = UI::InputText("Password (optional)", createLobbyPassword);
 
-        if (UI::Button("Create Lobby")) {
-            // always generate the room code on the client/server side; do not allow manual entry
+        if (UI::Button("Create Room")) {
             Network::CreateLobby("", createLobbyPassword);
             createLobbyPassword = "";
         }

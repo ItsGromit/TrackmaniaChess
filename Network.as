@@ -211,6 +211,11 @@ namespace Network {
             isWhite = bool(msg["isWhite"]);
             string fen  = string(msg["fen"]);
             string turn = string(msg["turn"]); // "w"/"b"
+
+            // Reset game state variables
+            gameOver = false;
+            gameResult = "";
+
             ApplyFEN(fen, turn);
             GameManager::currentState = GameState::Playing;
         }
