@@ -192,7 +192,7 @@ function onMessage(socket, msg) {
 }
 
 // ---------- TCP server / NDJSON framing ----------
-const PORT = process.env.PORT || process.env.TCP_PORT || 29802; // Railway often injects PORT
+const TCP_PORT = process.env.TCP_PORT || 29802;
 const server = net.createServer((socket) => {
   socket.id = Math.random().toString(36).slice(2, 9);
   socket.setEncoding('utf8');
@@ -225,12 +225,13 @@ const server = net.createServer((socket) => {
   send(socket, { type: 'hello', id: socket.id });
 });
 
-server.listen(PORT, () => {
-  console.log(`Authoritative TCP chess server listening on ${PORT}`);
+server.listen(TCP_PORT, () => {
+  console.log(`Authoritative TCP chess server listening on ${TCP_PORT}`);
 });
 
 // ---------- HTTP Stats Server ----------
-const HTTP_PORT = process.env.HTTP_PORT || 8080;
+// Railway will set PORT for the HTTP server, fallback to 8080 locally
+const HTTP_PORT = process.env.PORT || 8080;
 const httpServer = http.createServer((req, res) => {
   // Enable CORS for browser access
   res.setHeader('Access-Control-Allow-Origin', '*');
