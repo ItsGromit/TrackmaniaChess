@@ -2,8 +2,8 @@ namespace Network {
     Net::Socket@ sock;
     bool isConnected = false;
 
-    [Setting category="Network" name="Server host"] string serverHost = "turntable.proxy.rlwy.net";
-    [Setting category="Network" name="Server port"] uint   serverPort = 47523;
+    [Setting category="Network" name="Server host"] string serverHost = "yamanote.proxy.rlwy.net";
+    [Setting category="Network" name="Server port"] uint   serverPort = 36621;
 
     string playerId;
     string currentLobbyId;
