@@ -2,8 +2,8 @@ namespace Network {
     Net::Socket@ sock;
     bool isConnected = false;
 
-    [Setting category="Network" name="Server host"] string serverHost = "shortline.proxy.rlwy.net";
-    [Setting category="Network" name="Server port"] uint   serverPort = 37920;
+    [Setting category="Network" name="Server host"] string serverHost = "turntable.proxy.rlwy.net";
+    [Setting category="Network" name="Server port"] uint   serverPort = 47523;
 
     string playerId;
     string currentLobbyId;
@@ -75,9 +75,16 @@ namespace Network {
             if (line.Length == 0) continue;
 
             Json::Value msg;
-            bool ok = true;
-            try { msg = Json::Parse(line); } catch { ok = false; }
-            if (ok) HandleMsg(msg);
+            try {
+                msg = Json::Parse(line);
+                if (msg.GetType() == Json::Type::Object) {
+                    HandleMsg(msg);
+                } else {
+                    print("Network::Update - Parsed JSON is not an object: " + line);
+                }
+            } catch {
+                print("Network::Update - JSON parse error: " + line);
+            }
         }
     }
 
@@ -163,6 +170,12 @@ namespace Network {
 
     // ---------- Messages ----------
     void HandleMsg(Json::Value &msg) {
+        // Safety check: ensure msg is valid
+        if (msg.GetType() != Json::Type::Object) {
+            print("Network::HandleMsg - Invalid message type: " + msg.GetType());
+            return;
+        }
+
         string t = msg["type"];
 
         if (t == "hello") {

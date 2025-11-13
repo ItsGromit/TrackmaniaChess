@@ -192,7 +192,7 @@ function onMessage(socket, msg) {
 }
 
 // ---------- TCP server / NDJSON framing ----------
-const TCP_PORT = process.env.TCP_PORT || 29802;
+const TCP_PORT = process.env.TCP_PORT || 29801;
 const server = net.createServer((socket) => {
   socket.id = Math.random().toString(36).slice(2, 9);
   socket.setEncoding('utf8');
@@ -231,7 +231,7 @@ server.listen(TCP_PORT, () => {
 
 // ---------- HTTP Stats Server ----------
 // Railway will set PORT for the HTTP server, fallback to 8080 locally
-const HTTP_PORT = process.env.PORT || 8080;
+const HTTP_PORT = process.env.PORT || 29801;
 const httpServer = http.createServer((req, res) => {
   // Enable CORS for browser access
   res.setHeader('Access-Control-Allow-Origin', '*');
