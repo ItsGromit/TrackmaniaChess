@@ -11,10 +11,8 @@ namespace Network {
     bool   isWhite = false;
     bool   isHost  = false;
 
-    // file letters (avoid chr())
     const array<string> FILES = {"a","b","c","d","e","f","g","h"};
 
-    // Helper function to get local player's display name
     string GetLocalPlayerName() {
         auto app = GetApp();
         if (app is null) return "Player";
@@ -29,8 +27,6 @@ namespace Network {
         int    players;
         bool   open;
         bool   hasPassword;
-        // Some UI code references l.password; keep it so it compiles.
-        // We don't know the actual password, so just show "*" when hasPassword=true.
         string password;
         array<string> playerNames;
     }
@@ -40,8 +36,6 @@ namespace Network {
 
     void Init() {
         @sock = Net::Socket();
-        // Note: Net::Socket has no SetBlocking() on Openplanet. Non-blocking read is achieved
-        // by calling ReadRaw(n) with a small n each frame. We'll mark connected after Connect().
     }
 
     bool Connect() {
@@ -63,7 +57,6 @@ namespace Network {
     void Update() {
         if (!isConnected || sock is null) return;
 
-        // Read small chunks each frame; returns "" if nothing available.
         string chunk = sock.ReadRaw(32768);
         if (chunk.Length == 0) return;
 
@@ -103,7 +96,7 @@ namespace Network {
         j["type"] = "create_lobby";
         if (roomCode.Length > 0) j["roomCode"] = roomCode;
         if (password.Length > 0) j["password"] = password;
-        // Use provided name or get local player name
+        // Get local player name
         string name = playerName.Length > 0 ? playerName : GetLocalPlayerName();
         j["playerName"] = name;
         SendJson(j);
@@ -115,7 +108,7 @@ namespace Network {
         j["type"] = "join_lobby";
         j["lobbyId"] = lobbyId;
         if (password.Length > 0) j["password"] = password;
-        // Use provided name or get local player name
+        // Use local player name
         string name = playerName.Length > 0 ? playerName : GetLocalPlayerName();
         j["playerName"] = name;
         SendJson(j);
@@ -228,6 +221,7 @@ namespace Network {
             // Reset game state variables
             gameOver = false;
             gameResult = "";
+            moveHistory.Resize(0); // Clear move history for new game
 
             ApplyFEN(fen, turn);
             GameManager::currentState = GameState::Playing;
@@ -235,6 +229,20 @@ namespace Network {
         else if (t == "moved") {
             string fen  = string(msg["fen"]);
             string turn = string(msg["turn"]);
+
+            // Parse move information and add to history
+            if (msg.HasKey("from") && msg.HasKey("to")) {
+                string fromAlg = string(msg["from"]);
+                string toAlg = string(msg["to"]);
+
+                // Convert algebraic notation to row/col
+                int fromRow, fromCol, toRow, toCol;
+                if (AlgToRowCol(fromAlg, fromRow, fromCol) && AlgToRowCol(toAlg, toRow, toCol)) {
+                    Move@ m = Move(fromRow, fromCol, toRow, toCol);
+                    moveHistory.InsertLast(m);
+                }
+            }
+
             ApplyFEN(fen, turn);
         }
         else if (t == "game_over") {
@@ -243,17 +251,42 @@ namespace Network {
             GameManager::currentState = GameState::GameOver;
             gameOver = true;
             gameResult = (winner.Length > 0 ? winner : "none") + " — " + reason;
-            gameId = "";
+            // Don't clear gameId here so rematch can use it
         }
         else if (t == "error") {
             UI::ShowNotification("Chess", "Error: " + string(msg["code"]), vec4(1,0.4,0.4,1), 4000);
         }
     }
 
-    // row/col -> "a1" (avoid chr())
+    // row/col -> "a1"
     string ToAlg(int row, int col) {
         string file = (col >= 0 && col < 8) ? FILES[col] : "?";
         int rank = 8 - row;
         return file + rank;
+    }
+
+    // "a1" -> row/col
+    bool AlgToRowCol(const string &in alg, int &out row, int &out col) {
+        if (alg.Length < 2) return false;
+
+        string file = alg.SubStr(0, 1).ToLower();
+        string rankStr = alg.SubStr(1, 1);
+
+        // Convert file (a-h) to column (0-7)
+        col = -1;
+        for (uint i = 0; i < FILES.Length; i++) {
+            if (FILES[i] == file) {
+                col = int(i);
+                break;
+            }
+        }
+        if (col < 0 || col > 7) return false;
+
+        // Convert rank (1-8) to row (7-0)
+        int rank = Text::ParseInt(rankStr);
+        if (rank < 1 || rank > 8) return false;
+        row = 8 - rank;
+
+        return true;
     }
 }

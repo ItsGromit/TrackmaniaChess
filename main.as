@@ -50,11 +50,15 @@ void RenderMenu() {
 void Render() {
     if (!showWindow) return;
 
-    
+
 
     EnsurePieceAssetsLoaded();
-    
-    UI::SetNextWindowSize(600, 680, UI::Cond::FirstUseEver);
+
+    // Set default window size to half of screen height
+    vec2 screenSize = vec2(Draw::GetWidth(), Draw::GetHeight());
+    float defaultHeight = screenSize.y * 0.5f;
+    float defaultWidth = defaultHeight * 0.75f; // Maintain a reasonable aspect ratio
+    UI::SetNextWindowSize(int(defaultWidth), int(defaultHeight), UI::Cond::FirstUseEver);
     if (UI::Begin("Chess Race", showWindow)) {
         switch (GameManager::currentState) {
             case GameState::Menu: {
@@ -115,21 +119,14 @@ void Render() {
                 break;
             }
             
-            case GameState::Playing: {
-                // Game UI will be rendered below when in Playing state
-                break;
-            }
-            
+            case GameState::Playing:
             case GameState::GameOver: {
-                UI::Text("Game Over: " + gameResult);
-                if (UI::Button("Back to Menu")) {
-                    GameManager::currentState = GameState::Menu;
-                }
+                // Game UI will be rendered below for both Playing and GameOver states
                 break;
             }
         }
-        
-        if (GameManager::currentState == GameState::Playing) {
+
+        if (GameManager::currentState == GameState::Playing || GameManager::currentState == GameState::GameOver) {
             // Game info
             string turnText = (currentTurn == PieceColor::White) ? "\\$fffWhite" : "\\$666Black";
             UI::Text("Turn: " + turnText);
@@ -151,13 +148,13 @@ void Render() {
             UI::Separator();
 
             // Draw chess board
-            vec2 boardPos = UI::GetCursorPos();
-
             // Calculate available space for the board
             vec2 contentRegion = UI::GetContentRegionAvail();
 
-            // Reserve space for UI elements below the board (buttons, move history, etc.)
-            float reservedHeight = 200.0f;
+            // Reserve space for UI elements below the board AND minimum move history space
+            float moveHistoryMinHeight = 100.0f; // Minimum visible space for move history
+            float belowBoardUIHeight = 80.0f; // Space for buttons, color text, separator, etc.
+            float reservedHeight = belowBoardUIHeight + moveHistoryMinHeight;
             float availableHeight = contentRegion.y - reservedHeight;
             float availableWidth = contentRegion.x - 20.0f; // Add padding
 
@@ -173,8 +170,44 @@ void Render() {
             // Flip board if playing as black
             bool flipBoard = (Network::gameId != "" && !Network::isWhite);
 
+            // Label dimensions
+            float labelSize = 20.0f;
+
+            // Center the board horizontally (accounting for left labels)
+            float boardWidth = squareSize * 8.0f;
+            float totalWidth = labelSize + boardWidth;
+            float centerOffset = (contentRegion.x - totalWidth) / 2.0f;
+            vec2 currentPos = UI::GetCursorPos();
+            UI::SetCursorPos(vec2(currentPos.x + centerOffset, currentPos.y));
+
+            // Reserve space for top labels
+            vec2 startPos = UI::GetCursorPos();
+            UI::SetCursorPos(vec2(startPos.x, startPos.y + labelSize));
+
+            vec2 boardPos = UI::GetCursorPos();
+
             // Set button rounding to 0 for sharp corners
             UI::PushStyleVar(UI::StyleVar::FrameRounding, 0.0f);
+
+            // Draw row labels (1-8) on the left side
+            array<string> rankLabels = {"8", "7", "6", "5", "4", "3", "2", "1"};
+            for (int row = 0; row < 8; row++) {
+                // When flipped: visual row 0 should show "1", visual row 7 should show "8"
+                // When not flipped: visual row 0 should show "8", visual row 7 should show "1"
+                string label = flipBoard ? rankLabels[7 - row] : rankLabels[row];
+                UI::SetCursorPos(vec2(boardPos.x - labelSize, boardPos.y + row * squareSize + squareSize / 2.0f - 7.0f));
+                UI::Text(label);
+            }
+
+            // Draw column labels (a-h) on the bottom
+            array<string> fileLabels = {"a", "b", "c", "d", "e", "f", "g", "h"};
+            for (int col = 0; col < 8; col++) {
+                // When flipped: visual col 0 should show "h", visual col 7 should show "a"
+                // When not flipped: visual col 0 should show "a", visual col 7 should show "h"
+                string label = flipBoard ? fileLabels[7 - col] : fileLabels[col];
+                UI::SetCursorPos(vec2(boardPos.x + col * squareSize + squareSize / 2.0f - 4.0f, boardPos.y + 8 * squareSize + 2.0f));
+                UI::Text(label);
+            }
 
             for (int row = 0; row < 8; row++) {
                 for (int col = 0; col < 8; col++) {
@@ -226,7 +259,7 @@ void Render() {
 
                     // 1) Button for the square (for clicks)
                     bool clicked = UI::Button("##" + row + "_" + col, vec2(squareSize, squareSize));
-                    if (clicked && !gameOver) HandleSquareClick(row, col);
+                    if (clicked && !gameOver && GameManager::currentState != GameState::GameOver) HandleSquareClick(row, col);
 
                     // 2) Overlay the piece texture using the window draw list (on top of the button)
                     UI::Texture@ tex = GetPieceTexture(chessBoard.board[row][col]);
@@ -240,8 +273,8 @@ void Render() {
 
             // Restore button rounding
             UI::PopStyleVar();
-            
-            UI::SetCursorPos(boardPos + vec2(0, 8 * squareSize + 10));
+
+            UI::SetCursorPos(boardPos + vec2(0, 8 * squareSize + labelSize + 10));
 
             // Display player's color prominently at the bottom
             string colorDisplayText = Network::isWhite ? "\\$fffYou are playing as WHITE" : "\\$666You are playing as BLACK";
@@ -249,43 +282,49 @@ void Render() {
 
             UI::Separator();
 
-            // Online game buttons
-            if (Network::gameId != "") {
-                if (UI::Button("Forfeit")) {
-                    Network::Resign();
-                }
-                UI::SameLine();
-                if (UI::Button("New Game")) {
-                    Network::RequestNewGame();
-                }
-            } else {
-                // Local game buttons
-                if (UI::Button("New Game")) {
-                    chessBoard.InitializeBoard();
-                    // re-link globals
-                    @board       = chessBoard.GetBoard();
-                    currentTurn  = chessBoard.currentTurn;
-                    selectedRow  = chessBoard.selectedRow;
-                    selectedCol  = chessBoard.selectedCol;
-                    moveHistory  = chessBoard.moveHistory;
-                    gameOver     = chessBoard.gameOver;
-                    gameResult   = chessBoard.gameResult;
-                }
+            // Only show game buttons when not in GameOver state
+            if (GameManager::currentState != GameState::GameOver) {
+                // Online game buttons
+                if (Network::gameId != "") {
+                    if (UI::Button("Forfeit")) {
+                        Network::Resign();
+                    }
+                    UI::SameLine();
+                    if (UI::Button("New Game")) {
+                        Network::RequestNewGame();
+                    }
+                } else {
+                    // Local game buttons
+                    if (UI::Button("New Game")) {
+                        chessBoard.InitializeBoard();
+                        // re-link globals
+                        @board       = chessBoard.GetBoard();
+                        currentTurn  = chessBoard.currentTurn;
+                        selectedRow  = chessBoard.selectedRow;
+                        selectedCol  = chessBoard.selectedCol;
+                        moveHistory  = chessBoard.moveHistory;
+                        gameOver     = chessBoard.gameOver;
+                        gameResult   = chessBoard.gameResult;
+                    }
 
-                UI::SameLine();
+                    UI::SameLine();
 
-                if (UI::Button("Undo Move") && moveHistory.Length > 0) {
-                    UndoLastMove();
+                    if (UI::Button("Undo Move") && moveHistory.Length > 0) {
+                        UndoLastMove();
+                    }
                 }
             }
             
-            // Move history
+            // Move history - separate scrollable section
             UI::Separator();
             UI::Text("Move History:");
-            UI::BeginChild("MoveHistory", vec2(0, 100));
+
+            // Use remaining window space for scrollable move history
+            vec2 remainingSpace = UI::GetContentRegionAvail();
+            UI::BeginChild("MoveHistory", vec2(0, remainingSpace.y), true);
             for (uint i = 0; i < moveHistory.Length; i++) {
                 Move@ m = moveHistory[i];
-                string moveText = "" + (i + 1) + ". " + 
+                string moveText = "" + (i + 1) + ". " +
                                 GetColumnName(m.fromCol) + (8 - m.fromRow) + " -> " +
                                 GetColumnName(m.toCol) + (8 - m.toRow);
                 UI::Text(moveText);
@@ -294,6 +333,53 @@ void Render() {
         } // end Playing UI
     }
     UI::End();
+
+    // Game over modal window - positioned relative to the main chess window
+    if (GameManager::currentState == GameState::GameOver) {
+        // Get the main window's position and size
+        vec2 mainWindowPos = UI::GetWindowPos();
+        vec2 mainWindowSize = UI::GetWindowSize();
+
+        // Calculate center of the main window
+        vec2 modalSize = vec2(350, 200);
+        vec2 modalPos = mainWindowPos + (mainWindowSize - modalSize) * 0.5f;
+
+        UI::SetNextWindowSize(int(modalSize.x), int(modalSize.y), UI::Cond::Always);
+        UI::SetNextWindowPos(int(modalPos.x), int(modalPos.y), UI::Cond::Always);
+
+        UI::Begin("Game Over", UI::WindowFlags::NoResize | UI::WindowFlags::NoCollapse);
+
+        UI::Text("\\$f00GAME OVER");
+        UI::Separator();
+        UI::NewLine();
+
+        UI::TextWrapped(gameResult);
+        UI::NewLine();
+        UI::Separator();
+        UI::NewLine();
+
+        // Center buttons
+        float buttonWidth = 120.0f;
+        float spacing = 20.0f;
+        float totalWidth = buttonWidth * 2 + spacing;
+        float startX = (350.0f - totalWidth) / 2.0f;
+
+        UI::SetCursorPos(vec2(startX, UI::GetCursorPos().y));
+        if (UI::Button("Rematch", vec2(buttonWidth, 35.0f))) {
+            Network::RequestNewGame();
+        }
+
+        UI::SameLine();
+        UI::Dummy(vec2(spacing, 0));
+        UI::SameLine();
+
+        if (UI::Button("Back to Menu", vec2(buttonWidth, 35.0f))) {
+            GameManager::currentState = GameState::Menu;
+            Network::gameId = "";
+        }
+
+        UI::End();
+    }
 }
 
 // ------------------------------------------------------------

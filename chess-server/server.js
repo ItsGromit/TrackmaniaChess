@@ -6,6 +6,7 @@ const { Chess } = require('chess.js');
 const games = new Map();     // gameId -> { white:Socket, black:Socket, chess:Chess, createdAt:number }
 const lobbies = new Map();   // lobbyId -> { id, host:Socket, players:Socket[], playerNames:string[], password:string, open:boolean }
 const clients = new Set();   // connected sockets
+const lastOpponents = new Map(); // socket -> opponent socket (for rematch after game ends)
 
 // ---------- Utils ----------
 function send(c, obj) {
@@ -82,6 +83,12 @@ function onMessage(socket, msg) {
       const game = { white: p1, black: p2, chess, createdAt: Date.now() };
       games.set(gameId, game);
 
+      // Store opponents for rematch
+      if (p1 && p2) {
+        lastOpponents.set(p1, p2);
+        lastOpponents.set(p2, p1);
+      }
+
       send(p1, { type: 'game_start', gameId, isWhite: true, opponentId: p2 ? p2.id : null, fen: chess.fen(), turn: 'w' });
       if (p2) {
         send(p2, { type: 'game_start', gameId, isWhite: false, opponentId: p1.id, fen: chess.fen(), turn: 'w' });
@@ -136,18 +143,25 @@ function onMessage(socket, msg) {
     }
 
     case 'new_game': {
-      const game = games.get(msg.gameId);
-      if (!game) return;
-      // Only allow if both players agree or if it's a single player game
-      const isPlayer = (socket === game.white || socket === game.black);
-      if (!isPlayer) return;
+      let game = games.get(msg.gameId);
+      let p1, p2;
 
-      // End the current game
-      games.delete(msg.gameId);
+      if (game) {
+        // Active game exists - use those players
+        const isPlayer = (socket === game.white || socket === game.black);
+        if (!isPlayer) return;
+        p1 = game.white;
+        p2 = game.black;
+        // End the current game
+        games.delete(msg.gameId);
+      } else {
+        // Game ended - use lastOpponents mapping
+        p1 = socket;
+        p2 = lastOpponents.get(socket);
+        if (!p2) return; // No opponent found for rematch
+      }
 
       // Create new game with randomized teams
-      const p1 = game.white;
-      const p2 = game.black;
       const newGameId = Math.random().toString(36).slice(2, 9);
       const chess = new Chess();
 
@@ -175,6 +189,12 @@ function onMessage(socket, msg) {
 
       const newGame = { white: newWhite, black: newBlack, chess, createdAt: Date.now() };
       games.set(newGameId, newGame);
+
+      // Update lastOpponents for the new game
+      if (p1 && p2) {
+        lastOpponents.set(p1, p2);
+        lastOpponents.set(p2, p1);
+      }
 
       if (newWhite) {
         send(newWhite, { type: 'game_start', gameId: newGameId, isWhite: true, opponentId: newBlack ? newBlack.id : null, fen: chess.fen(), turn: 'w' });
@@ -259,7 +279,7 @@ function cleanupOnDisconnect(sock) {
       }
     }
   }
-  // end any games they’re in
+  // end any games they're in
   for (const [gid, g] of [...games.entries()]) {
     if (g.white === sock || g.black === sock) {
       const winner = (g.white === sock) ? 'black' : 'white';
@@ -267,4 +287,10 @@ function cleanupOnDisconnect(sock) {
       games.delete(gid);
     }
   }
+  // clean up lastOpponents mappings
+  const opponent = lastOpponents.get(sock);
+  if (opponent) {
+    lastOpponents.delete(opponent); // Remove opponent's reference to this socket
+  }
+  lastOpponents.delete(sock);
 }
