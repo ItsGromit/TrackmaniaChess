@@ -94,7 +94,9 @@ function onMessage(socket, msg) {
         send(p2, { type: 'game_start', gameId, isWhite: false, opponentId: p1.id, fen: chess.fen(), turn: 'w' });
       }
 
-      lobbies.delete(l.id);
+      // Keep the lobby alive for rematches instead of deleting it
+      // Mark the lobby as "in game" so it doesn't show in the lobby list
+      l.open = false;
       broadcastLobbyList();
       break;
     }
@@ -128,10 +130,19 @@ function onMessage(socket, msg) {
         else if (game.chess.isThreefoldRepetition()) reason = 'threefold';
         else if (game.chess.isInsufficientMaterial()) reason = 'insufficient';
         broadcastPlayers(game, { type: 'game_over', gameId: msg.gameId, reason, winner });
+
         // Store opponents for rematch before deleting game
         if (game.white && game.black) {
           lastOpponents.set(game.white, game.black);
           lastOpponents.set(game.black, game.white);
+
+          // Find the lobby for these players and reopen it
+          for (const [lid, lobby] of lobbies) {
+            if (lobby.players.includes(game.white) || lobby.players.includes(game.black)) {
+              lobby.open = false; // Keep closed to prevent new players joining during rematch
+              break;
+            }
+          }
         }
         games.delete(msg.gameId);
       }
@@ -143,10 +154,19 @@ function onMessage(socket, msg) {
       if (!game) return;
       const winner = (socket === game.white) ? 'black' : 'white';
       broadcastPlayers(game, { type: 'game_over', gameId: msg.gameId, reason: 'resign', winner });
+
       // Store opponents for rematch before deleting game
       if (game.white && game.black) {
         lastOpponents.set(game.white, game.black);
         lastOpponents.set(game.black, game.white);
+
+        // Find the lobby for these players and keep it closed for rematch
+        for (const [, lobby] of lobbies) {
+          if (lobby.players.includes(game.white) || lobby.players.includes(game.black)) {
+            lobby.open = false; // Keep closed to prevent new players joining during rematch
+            break;
+          }
+        }
       }
       games.delete(msg.gameId);
       break;

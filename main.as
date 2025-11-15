@@ -487,7 +487,15 @@ void Render() {
 
         UI::SetCursorPos(vec2(startX, UI::GetCursorPos().y));
         if (UI::Button("Rematch", vec2(buttonWidth, 35.0f))) {
-            Network::RequestNewGame();
+            // Simply start a new game in the current lobby
+            if (Network::currentLobbyId.Length > 0) {
+                print("[Chess] Rematch requested - Starting new game in lobby: " + Network::currentLobbyId);
+                Network::StartGame(Network::currentLobbyId);
+                // Clear the game over state to return to lobby waiting
+                GameManager::currentState = GameState::InLobby;
+            } else {
+                print("[Chess] Cannot rematch - no lobby ID available");
+            }
         }
 
         UI::SameLine();
