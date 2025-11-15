@@ -718,7 +718,7 @@ void LoadRaceMap() {
         return;
     }
 
-    print("[Chess] Loading map: " + Network::raceMapUid);
+    print("[Chess] Loading map with ID: " + Network::raceMapUid);
 
     // Get the Trackmania app
     auto app = cast<CTrackMania>(GetApp());
@@ -727,8 +727,19 @@ void LoadRaceMap() {
         return;
     }
 
-    // Load the map by UID
-    app.ManiaPlanetScriptAPI.LoadTitle(Network::raceMapUid, "", false);
+    // Access the menu system to load the map
+    auto menuBase = cast<CGameModuleMenuBase>(app.MenuManager.MenuCustom_CurrentManiaApp);
+    if (menuBase is null) {
+        print("[Chess] Could not access menu base");
+        return;
+    }
+
+    // Load map from Trackmania Exchange using the map ID
+    string tmxUrl = "https://trackmania.exchange/maps/download/" + Network::raceMapUid;
+    print("[Chess] Loading map from TMX: " + tmxUrl);
+
+    // Use Openplanet's PlayMap function to load the map in solo mode
+    menuBase.PlayMap(tmxUrl);
 
     raceInProgress = true;
     raceStartTime = Time::Now;
