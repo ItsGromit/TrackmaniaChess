@@ -2,6 +2,15 @@
 PieceAssets pAssets;
 
 bool showWindow = false;
+bool windowResizable = false; // Window is locked by default
+
+// Menu tab state
+enum MenuTab {
+    Home,
+    Play,
+    Settings
+}
+MenuTab currentMenuTab = MenuTab::Home;
 
 // UI overrides for server host/port (kept from your snippet)
 string ui_serverHost = "";
@@ -25,7 +34,9 @@ void Main() {
 }
 
 void OnDestroyed() {
+    print("[Chess] Plugin unloading - disconnecting from server");
     Network::Disconnect();
+    print("[Chess] Disconnected from server");
 }
 
 void Update(float dt) {
@@ -56,36 +67,149 @@ void Render() {
 
     // Set default window size to half of screen height
     vec2 screenSize = vec2(Draw::GetWidth(), Draw::GetHeight());
-    float defaultHeight = screenSize.y * 0.5f;
-    float defaultWidth = defaultHeight * 0.75f; // Maintain a reasonable aspect ratio
+    float defaultHeight = screenSize.y * 0.5f; // Increased from 0.5f to 0.55f for more space
+    float defaultWidth = defaultHeight * 1.0f; // Increased width to accommodate move history panel + board
     UI::SetNextWindowSize(int(defaultWidth), int(defaultHeight), UI::Cond::FirstUseEver);
-    if (UI::Begin("Chess Race", showWindow)) {
+
+    // Set window flags based on resize lock
+    int windowFlags = windowResizable ? 0 : UI::WindowFlags::NoResize;
+
+    // Variables to store main window position/size for modal centering
+    vec2 mainWindowPos;
+    vec2 mainWindowSize;
+
+    if (UI::Begin("Chess Race", showWindow, windowFlags)) {
+        // Add resize lock toggle button in top right corner (always visible)
+        string lockText = windowResizable ? "Lock" : "Unlock";
+        float lockButtonWidth = 60.0f;
+        vec2 windowSize = UI::GetWindowSize();
+        vec2 cursorStart = UI::GetCursorPos();
+        UI::SetCursorPos(vec2(windowSize.x - lockButtonWidth - 10.0f, cursorStart.y));
+        if (UI::Button(lockText, vec2(lockButtonWidth, 0))) {
+            windowResizable = !windowResizable;
+        }
+        UI::SetCursorPos(cursorStart);
+
         switch (GameManager::currentState) {
             case GameState::Menu: {
-                UI::Text("Chess Race");
+                // Tab navigation bar
+                float tabButtonWidth = 80.0f;
+
+                // Home tab
+                vec4 homeColor = currentMenuTab == MenuTab::Home ? vec4(0.2f, 0.5f, 0.8f, 1.0f) : vec4(0.26f, 0.26f, 0.26f, 1.0f);
+                UI::PushStyleColor(UI::Col::Button, homeColor);
+                if (UI::Button("Home", vec2(tabButtonWidth, 30.0f))) {
+                    currentMenuTab = MenuTab::Home;
+                }
+                UI::PopStyleColor();
+
+                UI::SameLine();
+
+                // Play tab
+                vec4 playColor = currentMenuTab == MenuTab::Play ? vec4(0.2f, 0.5f, 0.8f, 1.0f) : vec4(0.26f, 0.26f, 0.26f, 1.0f);
+                UI::PushStyleColor(UI::Col::Button, playColor);
+                if (UI::Button("Play", vec2(tabButtonWidth, 30.0f))) {
+                    currentMenuTab = MenuTab::Play;
+                }
+                UI::PopStyleColor();
+
+                UI::SameLine();
+
+                // Settings tab
+                vec4 settingsColor = currentMenuTab == MenuTab::Settings ? vec4(0.2f, 0.5f, 0.8f, 1.0f) : vec4(0.26f, 0.26f, 0.26f, 1.0f);
+                UI::PushStyleColor(UI::Col::Button, settingsColor);
+                if (UI::Button("Settings", vec2(tabButtonWidth, 30.0f))) {
+                    currentMenuTab = MenuTab::Settings;
+                }
+                UI::PopStyleColor();
+
                 UI::Separator();
+                UI::NewLine();
 
-                if (UI::Button("Play")) {
-                    // Ensure UI overrides are applied
-                    if (ui_serverHost != "") Network::serverHost = ui_serverHost;
-                    if (ui_serverPort != "") {
-                        uint portParsed = Text::ParseUInt(ui_serverPort);
-                        if (portParsed > 0) Network::serverPort = portParsed;
-                    }
+                // Tab content
+                if (currentMenuTab == MenuTab::Home) {
+                    // Home tab - Rules and information
+                vec2 contentRegion = UI::GetContentRegionAvail();
+                string titleText = "Chess Race";
+                float titleWidth = Draw::MeasureString(titleText).x;
+                vec2 currentPos = UI::GetCursorPos();
+                UI::SetCursorPos(vec2(currentPos.x + (contentRegion.x - titleWidth) * 0.5f, currentPos.y));
+                UI::Text(titleText);
+                UI::Separator();
+                    UI::NewLine();
 
+                    UI::TextWrapped("Welcome to Chess Race! This is a competitive chess game where you can play against other players online.");
+                    UI::NewLine();
+                    UI::Text("\\$f80Rules:");
+                    UI::TextWrapped("- Play follows standard chess rules");
+                    UI::TextWrapped("- Click a piece to select it, then click a valid square to move");
+                    UI::TextWrapped("- The game ends when checkmate is achieved or a player forfeits");
+                    UI::NewLine();
+                    UI::Text("\\$0f0How to Play:");
+                    UI::TextWrapped("1. Click the 'Play' tab to find or create a game");
+                    UI::TextWrapped("2. Join a lobby or create your own");
+                    UI::TextWrapped("3. Wait for an opponent and start playing!");
+
+                } else if (currentMenuTab == MenuTab::Play) {
+                    // Play tab - Show lobby browser directly
+                    // Auto-connect if not connected
                     if (!Network::isConnected) {
+                        // Ensure UI overrides are applied
+                        if (ui_serverHost != "") Network::serverHost = ui_serverHost;
+                        if (ui_serverPort != "") {
+                            uint portParsed = Text::ParseUInt(ui_serverPort);
+                            if (portParsed > 0) Network::serverPort = portParsed;
+                        }
+
+                        print("[Chess] Attempting to connect to server: " + Network::serverHost + ":" + Network::serverPort);
                         if (Network::Connect()) {
-                            GameManager::currentState = GameState::InQueue;
-                            // request available lobbies
+                            print("[Chess] Successfully connected to server");
                             Network::ListLobbies();
                         } else {
-                            UI::ShowNotification("Chess", "Failed to connect. Check host/port.", vec4(1,0.4,0.4,1), 4000);
+                            print("[Chess] Failed to connect to server");
                         }
-                    } else {
-                        GameManager::currentState = GameState::InQueue;
-                        Network::ListLobbies();
+                    }
+
+                    // Show lobby browser UI with centered title
+                    vec2 contentRegion = UI::GetContentRegionAvail();
+                    string titleText = "Lobby Browser";
+                    float titleWidth = Draw::MeasureString(titleText).x;
+                    vec2 currentPos = UI::GetCursorPos();
+                    UI::SetCursorPos(vec2(currentPos.x + (contentRegion.x - titleWidth) * 0.5f, currentPos.y));
+                    UI::Text(titleText);
+                    UI::NewLine();
+                    UI::Separator();
+                    UI::NewLine();
+
+                    // Render create lobby UI
+                    Lobby::RenderCreateLobby();
+
+                    // Show lobby list
+                    Lobby::RenderLobbyList();
+
+                } else if (currentMenuTab == MenuTab::Settings) {
+                    // Settings tab
+                    vec2 contentRegion = UI::GetContentRegionAvail();
+                    string titleText = "Settings";
+                    float titleWidth = Draw::MeasureString(titleText).x;
+                    vec2 currentPos = UI::GetCursorPos();
+                    UI::SetCursorPos(vec2(currentPos.x + (contentRegion.x - titleWidth) * 0.5f, currentPos.y));
+                    UI::Text(titleText);
+                    UI::Separator();
+                    UI::NewLine();
+
+                    UI::Text("Window Settings:");
+                    UI::NewLine();
+
+                    // Window resize toggle (moved from top right for settings page)
+                    string settingsLockText = windowResizable ? "Window is Unlocked" : "Window is Locked";
+                    string settingsButtonText = windowResizable ? "Lock Window Size" : "Unlock Window Size";
+                    UI::Text(settingsLockText);
+                    if (UI::Button(settingsButtonText, vec2(150.0f, 0))) {
+                        windowResizable = !windowResizable;
                     }
                 }
+
                 break;
             }
             
@@ -130,59 +254,73 @@ void Render() {
             // Game info
             string turnText = (currentTurn == PieceColor::White) ? "\\$fffWhite" : "\\$666Black";
             UI::Text("Turn: " + turnText);
-            
+
             if (!GameManager::isLocalPlayerTurn()) {
                 UI::Text("\\$ff0Waiting for opponent's move...");
             } else {
                 UI::Text("");
             }
-            
+
             if (IsInCheck(currentTurn)) {
                 UI::Text("\\$f00CHECK!");
             }
-            
+
             if (gameOver) {
                 UI::Text("\\$ff0" + gameResult);
             }
-            
+
             UI::Separator();
 
-            // Draw chess board
-            // Calculate available space for the board
+            // Calculate available space
             vec2 contentRegion = UI::GetContentRegionAvail();
 
-            // Reserve space for UI elements below the board AND minimum move history space
-            float moveHistoryMinHeight = 100.0f; // Minimum visible space for move history
-            float belowBoardUIHeight = 80.0f; // Space for buttons, color text, separator, etc.
-            float reservedHeight = belowBoardUIHeight + moveHistoryMinHeight;
-            float availableHeight = contentRegion.y - reservedHeight;
-            float availableWidth = contentRegion.x - 20.0f; // Add padding
+            // Move history width (left side)
+            float moveHistoryWidth = 150.0f;
+            float spacing = 10.0f;
+
+            // Label dimensions
+            float labelSize = 20.0f;
+
+            // Calculate board size
+            float belowBoardUIHeight = 110.0f; // Space for buttons, color text, separator
+            float availableHeight = contentRegion.y - belowBoardUIHeight;
+            // Account for move history, spacing, and board labels in width calculation
+            float availableWidth = contentRegion.x - moveHistoryWidth - spacing - labelSize - 20.0f;
 
             // Use the smaller dimension to ensure board fits and remains square
             float maxBoardSize = Math::Min(availableWidth, availableHeight);
-            // Add a minimum size to prevent the board from becoming too small
-            maxBoardSize = Math::Max(maxBoardSize, 240.0f);
-            // Add a maximum size to prevent the board from becoming too large
-            maxBoardSize = Math::Min(maxBoardSize, 800.0f);
+            maxBoardSize = Math::Max(maxBoardSize, 80.0f); // Reduced minimum size to allow smaller scaling
+            // Ensure we don't make the board so large that buttons get cut off
+            if (maxBoardSize > availableHeight) {
+                maxBoardSize = availableHeight;
+            }
 
             float squareSize = maxBoardSize / 8.0f;
 
             // Flip board if playing as black
             bool flipBoard = (Network::gameId != "" && !Network::isWhite);
 
-            // Label dimensions
-            float labelSize = 20.0f;
+            // Start with move history on the left
+            UI::BeginChild("MoveHistory", vec2(moveHistoryWidth, availableHeight + belowBoardUIHeight), true);
+            UI::Text("Move History:");
+            UI::Separator();
+            for (uint i = 0; i < moveHistory.Length; i++) {
+                Move@ m = moveHistory[i];
+                string moveText = "" + (i + 1) + ". " +
+                                GetColumnName(m.fromCol) + (8 - m.fromRow) + " -> " +
+                                GetColumnName(m.toCol) + (8 - m.toRow);
+                UI::Text(moveText);
+            }
+            UI::EndChild();
 
-            // Center the board horizontally (accounting for left labels)
-            float boardWidth = squareSize * 8.0f;
-            float totalWidth = labelSize + boardWidth;
-            float centerOffset = (contentRegion.x - totalWidth) / 2.0f;
-            vec2 currentPos = UI::GetCursorPos();
-            UI::SetCursorPos(vec2(currentPos.x + centerOffset, currentPos.y));
+            UI::SameLine();
+
+            // Right side: board and controls
+            UI::BeginGroup();
 
             // Reserve space for top labels
             vec2 startPos = UI::GetCursorPos();
-            UI::SetCursorPos(vec2(startPos.x, startPos.y + labelSize));
+            UI::SetCursorPos(vec2(startPos.x + labelSize, startPos.y + labelSize));
 
             vec2 boardPos = UI::GetCursorPos();
 
@@ -192,8 +330,6 @@ void Render() {
             // Draw row labels (1-8) on the left side
             array<string> rankLabels = {"8", "7", "6", "5", "4", "3", "2", "1"};
             for (int row = 0; row < 8; row++) {
-                // When flipped: visual row 0 should show "1", visual row 7 should show "8"
-                // When not flipped: visual row 0 should show "8", visual row 7 should show "1"
                 string label = flipBoard ? rankLabels[7 - row] : rankLabels[row];
                 UI::SetCursorPos(vec2(boardPos.x - labelSize, boardPos.y + row * squareSize + squareSize / 2.0f - 7.0f));
                 UI::Text(label);
@@ -202,8 +338,6 @@ void Render() {
             // Draw column labels (a-h) on the bottom
             array<string> fileLabels = {"a", "b", "c", "d", "e", "f", "g", "h"};
             for (int col = 0; col < 8; col++) {
-                // When flipped: visual col 0 should show "h", visual col 7 should show "a"
-                // When not flipped: visual col 0 should show "a", visual col 7 should show "h"
                 string label = flipBoard ? fileLabels[7 - col] : fileLabels[col];
                 UI::SetCursorPos(vec2(boardPos.x + col * squareSize + squareSize / 2.0f - 4.0f, boardPos.y + 8 * squareSize + 2.0f));
                 UI::Text(label);
@@ -314,40 +448,27 @@ void Render() {
                     }
                 }
             }
-            
-            // Move history - separate scrollable section
-            UI::Separator();
-            UI::Text("Move History:");
 
-            // Use remaining window space for scrollable move history
-            vec2 remainingSpace = UI::GetContentRegionAvail();
-            UI::BeginChild("MoveHistory", vec2(0, remainingSpace.y), true);
-            for (uint i = 0; i < moveHistory.Length; i++) {
-                Move@ m = moveHistory[i];
-                string moveText = "" + (i + 1) + ". " +
-                                GetColumnName(m.fromCol) + (8 - m.fromRow) + " -> " +
-                                GetColumnName(m.toCol) + (8 - m.toRow);
-                UI::Text(moveText);
-            }
-            UI::EndChild();
+            UI::EndGroup();
         } // end Playing UI
-    }
-    UI::End();
 
-    // Game over modal window - positioned relative to the main chess window
+        // Game over modal overlay - rendered inside the main window
     if (GameManager::currentState == GameState::GameOver) {
-        // Get the main window's position and size
-        vec2 mainWindowPos = UI::GetWindowPos();
-        vec2 mainWindowSize = UI::GetWindowSize();
+            // Get current window size for centering
+            vec2 modalWindowSize = UI::GetWindowSize();
+            vec2 modalWindowPos = UI::GetWindowPos();
 
-        // Calculate center of the main window
+            // Draw semi-transparent overlay
+            UI::DrawList@ drawList = UI::GetWindowDrawList();
+            vec4 overlayRect = vec4(modalWindowPos.x, modalWindowPos.y, modalWindowPos.x + modalWindowSize.x, modalWindowPos.y + modalWindowSize.y);
+            drawList.AddRectFilled(overlayRect, vec4(0, 0, 0, 0.7f));
+
+            // Modal content
         vec2 modalSize = vec2(350, 200);
-        vec2 modalPos = mainWindowPos + (mainWindowSize - modalSize) * 0.5f;
+            vec2 modalPos = (modalWindowSize - modalSize) * 0.5f;
 
-        UI::SetNextWindowSize(int(modalSize.x), int(modalSize.y), UI::Cond::Always);
-        UI::SetNextWindowPos(int(modalPos.x), int(modalPos.y), UI::Cond::Always);
-
-        UI::Begin("Game Over", UI::WindowFlags::NoResize | UI::WindowFlags::NoCollapse);
+            UI::SetCursorPos(modalPos);
+            UI::BeginChild("GameOverModal", modalSize, true);
 
         UI::Text("\\$f00GAME OVER");
         UI::Separator();
@@ -362,7 +483,7 @@ void Render() {
         float buttonWidth = 120.0f;
         float spacing = 20.0f;
         float totalWidth = buttonWidth * 2 + spacing;
-        float startX = (350.0f - totalWidth) / 2.0f;
+            float startX = (modalSize.x - totalWidth) / 2.0f;
 
         UI::SetCursorPos(vec2(startX, UI::GetCursorPos().y));
         if (UI::Button("Rematch", vec2(buttonWidth, 35.0f))) {
@@ -378,9 +499,15 @@ void Render() {
             Network::gameId = "";
         }
 
+            UI::EndChild();
+        }
+
+        // Store window position and size before ending the window (for potential future use)
+        mainWindowPos = UI::GetWindowPos();
+        mainWindowSize = UI::GetWindowSize();
+    }
         UI::End();
     }
-}
 
 // ------------------------------------------------------------
 // Click handling:
@@ -413,8 +540,36 @@ void HandleSquareClick(int row, int col) {
             return;
         } else {
             // Second click: attempting to move
+            // Validate the move before sending to server
+            if (!IsValidMove(gSelR, gSelC, row, col)) {
+                print("[Chess] Invalid move attempted: " + Network::ToAlg(gSelR, gSelC) + " -> " + Network::ToAlg(row, col));
+                gSelR = gSelC = -1;
+                selectedRow = selectedCol = -1;
+                return; // Invalid move, don't send to server
+            }
+
+            // Check if this move would leave the player in check
+            Piece temp = board[row][col];
+            board[row][col] = board[gSelR][gSelC];
+            board[gSelR][gSelC] = Piece();
+
+            bool wouldBeInCheck = IsInCheck(currentTurn);
+
+            // Restore the board
+            board[gSelR][gSelC] = board[row][col];
+            board[row][col] = temp;
+
+            if (wouldBeInCheck) {
+                print("[Chess] Move would leave king in check: " + Network::ToAlg(gSelR, gSelC) + " -> " + Network::ToAlg(row, col));
+                gSelR = gSelC = -1;
+                selectedRow = selectedCol = -1;
+                return; // Can't move into check
+            }
+
+            // Move is valid, send to server
             string fromAlg = Network::ToAlg(gSelR, gSelC);
             string toAlg   = Network::ToAlg(row, col);
+            print("[Chess] Sending valid move to server: " + fromAlg + " -> " + toAlg);
             Network::SendMove(fromAlg, toAlg);
             gSelR = gSelC = -1;
             selectedRow = selectedCol = -1;

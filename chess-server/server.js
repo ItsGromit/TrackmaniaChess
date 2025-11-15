@@ -128,6 +128,11 @@ function onMessage(socket, msg) {
         else if (game.chess.isThreefoldRepetition()) reason = 'threefold';
         else if (game.chess.isInsufficientMaterial()) reason = 'insufficient';
         broadcastPlayers(game, { type: 'game_over', gameId: msg.gameId, reason, winner });
+        // Store opponents for rematch before deleting game
+        if (game.white && game.black) {
+          lastOpponents.set(game.white, game.black);
+          lastOpponents.set(game.black, game.white);
+        }
         games.delete(msg.gameId);
       }
       break;
@@ -138,6 +143,11 @@ function onMessage(socket, msg) {
       if (!game) return;
       const winner = (socket === game.white) ? 'black' : 'white';
       broadcastPlayers(game, { type: 'game_over', gameId: msg.gameId, reason: 'resign', winner });
+      // Store opponents for rematch before deleting game
+      if (game.white && game.black) {
+        lastOpponents.set(game.white, game.black);
+        lastOpponents.set(game.black, game.white);
+      }
       games.delete(msg.gameId);
       break;
     }

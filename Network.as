@@ -99,6 +99,7 @@ namespace Network {
         // Get local player name
         string name = playerName.Length > 0 ? playerName : GetLocalPlayerName();
         j["playerName"] = name;
+        print("[Chess] Creating lobby - RoomCode: " + (roomCode.Length > 0 ? roomCode : "none") + ", HasPassword: " + (password.Length > 0 ? "yes" : "no") + ", Player: " + name);
         SendJson(j);
     }
 
@@ -146,7 +147,12 @@ namespace Network {
     }
 
     void Resign() {
-        if (gameId.Length == 0) return;
+        print("[Chess] Resign called - gameId: " + (gameId.Length > 0 ? gameId : "EMPTY"));
+        if (gameId.Length == 0) {
+            print("[Chess] Cannot resign - gameId is empty");
+            return;
+        }
+        print("[Chess] Sending resign request to server with gameId: " + gameId);
         Json::Value j = Json::Object();
         j["type"] = "resign";
         j["gameId"] = gameId;
@@ -154,7 +160,12 @@ namespace Network {
     }
 
     void RequestNewGame() {
-        if (gameId.Length == 0) return;
+        print("[Chess] RequestNewGame called - gameId: " + (gameId.Length > 0 ? gameId : "EMPTY"));
+        if (gameId.Length == 0) {
+            print("[Chess] Cannot request new game - gameId is empty");
+            return;
+        }
+        print("[Chess] Sending new_game request to server with gameId: " + gameId);
         Json::Value j = Json::Object();
         j["type"] = "new_game";
         j["gameId"] = gameId;
@@ -198,6 +209,7 @@ namespace Network {
         else if (t == "lobby_created") {
             currentLobbyId = string(msg["lobbyId"]);
             isHost = true;
+            print("[Chess] Lobby created successfully - LobbyId: " + currentLobbyId);
             GameManager::currentState = GameState::InLobby;
         }
         else if (t == "lobby_update") {
@@ -218,6 +230,8 @@ namespace Network {
             string fen  = string(msg["fen"]);
             string turn = string(msg["turn"]); // "w"/"b"
 
+            print("[Chess] Game starting - gameId: " + gameId + ", isWhite: " + isWhite + ", turn: " + turn);
+
             // Reset game state variables
             gameOver = false;
             gameResult = "";
@@ -225,6 +239,7 @@ namespace Network {
 
             ApplyFEN(fen, turn);
             GameManager::currentState = GameState::Playing;
+            print("[Chess] Game state updated to Playing");
         }
         else if (t == "moved") {
             string fen  = string(msg["fen"]);
@@ -248,9 +263,11 @@ namespace Network {
         else if (t == "game_over") {
             string reason = string(msg["reason"]);
             string winner = msg.HasKey("winner") ? string(msg["winner"]) : "none";
+            print("[Chess] Game over - reason: " + reason + ", winner: " + winner + ", gameId: " + gameId);
             GameManager::currentState = GameState::GameOver;
             gameOver = true;
             gameResult = (winner.Length > 0 ? winner : "none") + " — " + reason;
+            print("[Chess] gameId preserved for rematch: " + gameId);
             // Don't clear gameId here so rematch can use it
         }
         else if (t == "error") {
