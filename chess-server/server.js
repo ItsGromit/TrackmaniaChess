@@ -1,12 +1,14 @@
 // server.js (authoritative, raw TCP, NDJSON protocol)
 const net = require('net');
+const https = require('https');
 const { Chess } = require('chess.js');
 
 // ---------- State ----------
-const games = new Map();     // gameId -> { white:Socket, black:Socket, chess:Chess, createdAt:number }
+const games = new Map();     // gameId -> { white:Socket, black:Socket, chess:Chess, createdAt:number, raceChallenges:Map }
 const lobbies = new Map();   // lobbyId -> { id, host:Socket, players:Socket[], playerNames:string[], password:string, open:boolean }
 const clients = new Set();   // connected sockets
 const lastOpponents = new Map(); // socket -> opponent socket (for rematch after game ends)
+const raceChallenges = new Map(); // gameId -> { from, to, mapUid, mapName, defenderTime, defenderSocket, attackerSocket }
 
 // ---------- Utils ----------
 function send(c, obj) {
@@ -19,8 +21,26 @@ function broadcastPlayers(game, obj) {
 }
 function toAlgebra(s) { return s && typeof s === 'string' ? s : null; }
 
+// Fetch a random short map from Trackmania Exchange
+async function fetchRandomShortMap() {
+  return new Promise((resolve) => {
+    // Short maps (under 1 minute) from Trackmania Exchange
+    const shortMaps = [
+      { uid: '278818', name: 'Sprint Map 1' },
+      { uid: '278817', name: 'Sprint Map 2' },
+      { uid: '278431', name: 'Sprint Map 3' },
+      { uid: '278804', name: 'Sprint Map 4' },
+      { uid: '278788', name: 'Sprint Map 5' }
+    ];
+
+    const randomMap = shortMaps[Math.floor(Math.random() * shortMaps.length)];
+    console.log(`[Chess] Selected random map: ${randomMap.name} (${randomMap.uid})`);
+    resolve(randomMap);
+  });
+}
+
 // ---------- Message Handling ----------
-function onMessage(socket, msg) {
+async function onMessage(socket, msg) {
   const { type } = msg || {};
   switch (type) {
     // ----- Lobby flows -----
@@ -116,6 +136,56 @@ function onMessage(socket, msg) {
       const to = toAlgebra(msg.to);
       const promotion = msg.promo || 'q';
 
+      // Check if this is a capture BEFORE making the move
+      const targetSquare = game.chess.get(to);
+      const isCapture = targetSquare && targetSquare.color !== turnColor;
+
+      if (isCapture) {
+        // Trigger a race challenge instead of immediate capture
+        console.log(`[Chess] Capture detected: ${from} -> ${to}, triggering race challenge`);
+
+        // Get a random map
+        const map = await fetchRandomShortMap();
+
+        // Store the pending capture
+        const challenge = {
+          from,
+          to,
+          promotion,
+          mapUid: map.uid,
+          mapName: map.name,
+          attacker: socket,
+          defender: (socket === game.white) ? game.black : game.white,
+          defenderTime: null,
+          attackerTime: null,
+          gameId: msg.gameId
+        };
+
+        raceChallenges.set(msg.gameId, challenge);
+
+        // Notify both players
+        send(challenge.defender, {
+          type: 'race_challenge',
+          mapUid: map.uid,
+          mapName: map.name,
+          isDefender: true,
+          from,
+          to
+        });
+
+        send(challenge.attacker, {
+          type: 'race_challenge',
+          mapUid: map.uid,
+          mapName: map.name,
+          isDefender: false,
+          from,
+          to
+        });
+
+        break;
+      }
+
+      // Not a capture, process normally
       const res = game.chess.move({ from, to, promotion });
       if (!res) return send(socket, { type: 'error', code: 'ILLEGAL_MOVE' });
 
@@ -169,6 +239,103 @@ function onMessage(socket, msg) {
         }
       }
       games.delete(msg.gameId);
+      break;
+    }
+
+    case 'race_result': {
+      const challenge = raceChallenges.get(msg.gameId);
+      if (!challenge) return console.log('[Chess] No race challenge found for game:', msg.gameId);
+
+      const game = games.get(msg.gameId);
+      if (!game) return;
+
+      const time = msg.time;
+      console.log(`[Chess] Race result received: ${time}ms from ${socket === challenge.defender ? 'defender' : 'attacker'}`);
+
+      // Store the time
+      if (socket === challenge.defender) {
+        challenge.defenderTime = time;
+        // Notify attacker that defender finished
+        send(challenge.attacker, { type: 'race_defender_finished', time });
+      } else if (socket === challenge.attacker) {
+        challenge.attackerTime = time;
+      }
+
+      // If both have finished, determine winner
+      if (challenge.defenderTime !== null && challenge.attackerTime !== null) {
+        const captureSucceeded = challenge.attackerTime < challenge.defenderTime;
+        console.log(`[Chess] Race complete - Attacker: ${challenge.attackerTime}ms, Defender: ${challenge.defenderTime}ms, Capture ${captureSucceeded ? 'succeeded' : 'failed'}`);
+
+        if (captureSucceeded) {
+          // Attacker won, apply the capture
+          const res = game.chess.move({ from: challenge.from, to: challenge.to, promotion: challenge.promotion });
+          if (res) {
+            const fen = game.chess.fen();
+            const nextTurn = game.chess.turn();
+            broadcastPlayers(game, {
+              type: 'race_result',
+              captureSucceeded: true,
+              fen,
+              turn: nextTurn
+            });
+          }
+        } else {
+          // Defender won, capture fails - board stays the same
+          const fen = game.chess.fen();
+          const turn = game.chess.turn();
+          broadcastPlayers(game, {
+            type: 'race_result',
+            captureSucceeded: false,
+            fen,
+            turn
+          });
+        }
+
+        // Clean up challenge
+        raceChallenges.delete(msg.gameId);
+      }
+      break;
+    }
+
+    case 'race_retire': {
+      const challenge = raceChallenges.get(msg.gameId);
+      if (!challenge) return console.log('[Chess] No race challenge found for game:', msg.gameId);
+
+      const game = games.get(msg.gameId);
+      if (!game) return;
+
+      console.log(`[Chess] Player retired from race: ${socket === challenge.defender ? 'defender' : 'attacker'}`);
+
+      // Auto-forfeit: whoever retires loses
+      const captureSucceeded = socket === challenge.defender; // If defender retires, attacker wins
+
+      if (captureSucceeded) {
+        // Apply the capture
+        const res = game.chess.move({ from: challenge.from, to: challenge.to, promotion: challenge.promotion });
+        if (res) {
+          const fen = game.chess.fen();
+          const nextTurn = game.chess.turn();
+          broadcastPlayers(game, {
+            type: 'race_result',
+            captureSucceeded: true,
+            fen,
+            turn: nextTurn
+          });
+        }
+      } else {
+        // Capture fails
+        const fen = game.chess.fen();
+        const turn = game.chess.turn();
+        broadcastPlayers(game, {
+          type: 'race_result',
+          captureSucceeded: false,
+          fen,
+          turn
+        });
+      }
+
+      // Clean up challenge
+      raceChallenges.delete(msg.gameId);
       break;
     }
 

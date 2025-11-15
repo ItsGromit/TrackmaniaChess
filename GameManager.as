@@ -4,6 +4,7 @@ enum GameState {
     InQueue,
     InLobby,
     Playing,
+    RaceChallenge,  // When a capture triggers a race
     GameOver
 }
 

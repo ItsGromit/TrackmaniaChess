@@ -11,6 +11,14 @@ namespace Network {
     bool   isWhite = false;
     bool   isHost  = false;
 
+    // Race challenge state
+    string raceMapUid = "";
+    string raceMapName = "";
+    bool   isDefender = false;  // true if you're defending (race first)
+    int    defenderTime = -1;   // Defender's race time in ms
+    string captureFrom = "";    // Algebraic notation of attacking piece
+    string captureTo = "";      // Algebraic notation of target square
+
     const array<string> FILES = {"a","b","c","d","e","f","g","h"};
 
     string GetLocalPlayerName() {
@@ -172,6 +180,25 @@ namespace Network {
         SendJson(j);
     }
 
+    void SendRaceResult(int timeMs) {
+        if (gameId.Length == 0) return;
+        Json::Value j = Json::Object();
+        j["type"] = "race_result";
+        j["gameId"] = gameId;
+        j["time"] = timeMs;
+        print("[Chess] Sending race result: " + timeMs + "ms");
+        SendJson(j);
+    }
+
+    void RetireFromRace() {
+        if (gameId.Length == 0) return;
+        Json::Value j = Json::Object();
+        j["type"] = "race_retire";
+        j["gameId"] = gameId;
+        print("[Chess] Retiring from race - forfeiting piece");
+        SendJson(j);
+    }
+
     // ---------- Messages ----------
     void HandleMsg(Json::Value &msg) {
         // Safety check: ensure msg is valid
@@ -269,6 +296,46 @@ namespace Network {
             gameResult = (winner.Length > 0 ? winner : "none") + " — " + reason;
             print("[Chess] gameId preserved for rematch: " + gameId);
             // Don't clear gameId here so rematch can use it
+        }
+        else if (t == "race_challenge") {
+            // A capture attempt triggers a race
+            raceMapUid = string(msg["mapUid"]);
+            raceMapName = msg.HasKey("mapName") ? string(msg["mapName"]) : "Unknown Map";
+            isDefender = bool(msg["isDefender"]);
+            captureFrom = string(msg["from"]);
+            captureTo = string(msg["to"]);
+            defenderTime = -1;
+
+            print("[Chess] Race challenge started - Map: " + raceMapName + ", You are: " + (isDefender ? "Defender" : "Attacker"));
+            GameManager::currentState = GameState::RaceChallenge;
+
+            // Reset race state in main.as via external variable
+            raceStartedAt = Time::Now;
+        }
+        else if (t == "race_defender_finished") {
+            // Defender finished their race
+            defenderTime = int(msg["time"]);
+            print("[Chess] Defender finished race in " + defenderTime + "ms");
+        }
+        else if (t == "race_result") {
+            // Race completed, apply the result
+            bool captureSucceeded = bool(msg["captureSucceeded"]);
+            string fen = string(msg["fen"]);
+            string turn = string(msg["turn"]);
+
+            print("[Chess] Race result - Capture " + (captureSucceeded ? "succeeded" : "failed"));
+
+            // Apply the board state
+            ApplyFEN(fen, turn);
+            GameManager::currentState = GameState::Playing;
+
+            // Reset race state
+            raceMapUid = "";
+            raceMapName = "";
+            isDefender = false;
+            defenderTime = -1;
+            captureFrom = "";
+            captureTo = "";
         }
         else if (t == "error") {
             UI::ShowNotification("Chess", "Error: " + string(msg["code"]), vec4(1,0.4,0.4,1), 4000);

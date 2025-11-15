@@ -41,6 +41,7 @@ void OnDestroyed() {
 
 void Update(float dt) {
     Network::Update();
+    CheckRaceCompletion();
 }
 
 bool gPiecesLoaded = false;
@@ -240,6 +241,79 @@ void Render() {
 
                 // Render the current lobby details
                 Lobby::RenderCurrentLobby();
+                break;
+            }
+
+            case GameState::RaceChallenge: {
+                vec2 contentRegion = UI::GetContentRegionAvail();
+
+                // Title
+                string titleText = "\\$f80RACE CHALLENGE!";
+                float titleWidth = Draw::MeasureString(titleText).x;
+                vec2 currentPos = UI::GetCursorPos();
+                UI::SetCursorPos(vec2(currentPos.x + (contentRegion.x - titleWidth) * 0.5f, currentPos.y));
+                UI::Text(titleText);
+                UI::NewLine();
+                UI::Separator();
+                UI::NewLine();
+
+                // Explain the capture attempt
+                UI::TextWrapped("A piece capture has been challenged!");
+                UI::TextWrapped("Move: " + Network::captureFrom + " → " + Network::captureTo);
+                UI::NewLine();
+
+                // Show role
+                if (Network::isDefender) {
+                    UI::TextWrapped("\\$0f0You are DEFENDING your piece!");
+                    UI::TextWrapped("Set a time for your opponent to beat.");
+                } else {
+                    UI::TextWrapped("\\$f00You are ATTACKING!");
+                    if (Network::defenderTime > 0) {
+                        UI::TextWrapped("Beat the defender's time of " + (Network::defenderTime / 1000.0) + " seconds to capture the piece!");
+                    } else {
+                        UI::TextWrapped("Wait for the defender to finish their run...");
+                    }
+                }
+                UI::NewLine();
+
+                // Map info
+                UI::Text("Map: \\$fff" + Network::raceMapName);
+                UI::NewLine();
+
+                // Show timeout countdown
+                if (raceStartedAt > 0) {
+                    int elapsed = Time::Now - raceStartedAt;
+                    int remaining = raceTimeoutMs - elapsed;
+                    if (remaining > 0) {
+                        UI::Text("\\$f80Time remaining: " + (remaining / 1000) + " seconds");
+                    } else {
+                        UI::Text("\\$f00TIME'S UP!");
+                    }
+                } else {
+                    UI::Text("\\$888Time limit: 2 minutes");
+                }
+                UI::NewLine();
+
+                // Instructions
+                UI::Separator();
+                UI::TextWrapped("The map will load in solo mode. Complete your run and your time will be submitted automatically.");
+                UI::NewLine();
+
+                if (UI::Button("Load Map Now", vec2(150, 30))) {
+                    LoadRaceMap();
+                    if (raceStartedAt == 0) {
+                        raceStartedAt = Time::Now;
+                    }
+                }
+
+                UI::SameLine();
+
+                if (UI::Button("Retire (Forfeit)", vec2(150, 30))) {
+                    Network::RetireFromRace();
+                    raceInProgress = false;
+                    raceStartedAt = 0;
+                }
+
                 break;
             }
             
@@ -550,7 +624,6 @@ void HandleSquareClick(int row, int col) {
             // Second click: attempting to move
             // Validate the move before sending to server
             if (!IsValidMove(gSelR, gSelC, row, col)) {
-                print("[Chess] Invalid move attempted: " + Network::ToAlg(gSelR, gSelC) + " -> " + Network::ToAlg(row, col));
                 gSelR = gSelC = -1;
                 selectedRow = selectedCol = -1;
                 return; // Invalid move, don't send to server
@@ -568,7 +641,6 @@ void HandleSquareClick(int row, int col) {
             board[row][col] = temp;
 
             if (wouldBeInCheck) {
-                print("[Chess] Move would leave king in check: " + Network::ToAlg(gSelR, gSelC) + " -> " + Network::ToAlg(row, col));
                 gSelR = gSelC = -1;
                 selectedRow = selectedCol = -1;
                 return; // Can't move into check
@@ -577,7 +649,6 @@ void HandleSquareClick(int row, int col) {
             // Move is valid, send to server
             string fromAlg = Network::ToAlg(gSelR, gSelC);
             string toAlg   = Network::ToAlg(row, col);
-            print("[Chess] Sending valid move to server: " + fromAlg + " -> " + toAlg);
             Network::SendMove(fromAlg, toAlg);
             gSelR = gSelC = -1;
             selectedRow = selectedCol = -1;
@@ -633,4 +704,77 @@ const array<string> FILES_MAIN = {"a","b","c","d","e","f","g","h"};
 string GetColumnName(int col) {
     if (col < 0 || col >= 8) return "?";
     return FILES_MAIN[col];
+}
+
+// ---------- Race Challenge ----------
+bool raceInProgress = false;
+int raceStartTime = 0;
+int raceTimeoutMs = 120000; // 2 minutes in milliseconds
+int raceStartedAt = 0; // When the race challenge started (for timeout)
+
+void LoadRaceMap() {
+    if (Network::raceMapUid.Length == 0) {
+        print("[Chess] No map UID available");
+        return;
+    }
+
+    print("[Chess] Loading map: " + Network::raceMapUid);
+
+    // Get the Trackmania app
+    auto app = cast<CTrackMania>(GetApp());
+    if (app is null) {
+        print("[Chess] Could not get CTrackMania app");
+        return;
+    }
+
+    // Load the map by UID
+    app.ManiaPlanetScriptAPI.LoadTitle(Network::raceMapUid, "", false);
+
+    raceInProgress = true;
+    raceStartTime = Time::Now;
+}
+
+// Called every frame to check if player finished the race
+void CheckRaceCompletion() {
+    if (!raceInProgress) {
+        // Check for timeout even when not actively racing
+        if (GameManager::currentState == GameState::RaceChallenge && raceStartedAt > 0) {
+            int elapsed = Time::Now - raceStartedAt;
+            if (elapsed > raceTimeoutMs) {
+                print("[Chess] Race timed out - auto-retiring");
+                Network::RetireFromRace();
+                raceStartedAt = 0;
+            }
+        }
+        return;
+    }
+
+    auto app = cast<CTrackMania>(GetApp());
+    if (app is null) return;
+
+    auto network = cast<CTrackManiaNetwork>(app.Network);
+    if (network is null) return;
+
+    auto playground = cast<CSmArenaClient>(app.CurrentPlayground);
+    if (playground is null) return;
+
+    // Get the player
+    auto player = cast<CSmPlayer>(playground.GameTerminals[0].ControlledPlayer);
+    if (player is null) return;
+
+    auto scriptPlayer = cast<CSmScriptPlayer>(player.ScriptAPI);
+    if (scriptPlayer is null) return;
+
+    // Check if player finished
+    if (scriptPlayer.CurrentRaceTime > 0 && scriptPlayer.Score.BestRaceTimes.Length > 0) {
+        int finishTime = scriptPlayer.Score.BestRaceTimes[0];
+        print("[Chess] Race finished in " + finishTime + "ms");
+
+        // Send result to server
+        Network::SendRaceResult(finishTime);
+
+        raceInProgress = false;
+        raceStartTime = 0;
+        raceStartedAt = 0;
+    }
 }
