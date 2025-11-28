@@ -20,7 +20,7 @@ void DrawCenteredImageOverLastItem(UI::Texture@ tex, float padPx = 6.0f) {
     vec2 innerSize = size - vec2(2.0f * padPx, 2.0f * padPx);
 
     float side = Math::Min(innerSize.x, innerSize.y);
-    vec2 imgPos = innerPos + (innerSize - vec2(side, side) * 0.5f);
+    vec2 imgPos = innerPos + (innerSize - vec2(side, side)) * 0.5f;
     vec2 imgSize = vec2(side, side);
 
     dl.AddImage(tex, imgPos, imgSize, 0xFFFFFFFF);

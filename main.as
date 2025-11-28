@@ -1,4 +1,4 @@
-void Main() {
+﻿void Main() {
     Network::Init();
     InitializeGlobals();
 }
@@ -15,13 +15,9 @@ void OnDestroyed() {
 
 void Render() {
     if (!showWindow) return;
-
     EnsurePieceAssetsLoaded();
 
-    vec2 screenSize = vec2(Draw::GetWidth(), Draw::GetHeight());
-    float defaultHeight = screenSize.y * 0.5f;
-    float defaultWidth = defaultHeight * 1.0f;
-    UI::SetNextWindowSize(int(defaultWidth), int(defaultHeight), UI::Cond::FirstUseEver);
+    UI::SetNextWindowSize(int(defaultWidth), int(defaultHeight), UI::Cond::Appearing);
 
     int windowFlags = windowResizeable ? 0 : UI::WindowFlags::NoResize;
 

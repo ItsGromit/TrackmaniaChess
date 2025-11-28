@@ -1,6 +1,5 @@
 // server.js (authoritative, raw TCP, NDJSON protocol)
 const net = require('net');
-const https = require('https');
 const { Chess } = require('chess.js');
 
 // ---------- State ----------

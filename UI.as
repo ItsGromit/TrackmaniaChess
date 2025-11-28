@@ -16,17 +16,28 @@ void MainMenu() {
     UI::PushStyleColor(UI::Col::TitleBgCollapsed, bgColor);
 
     if (UI::Begin("Chess Race", showWindow, windowFlags)) {
+
         string lockText = windowResizeable ? Icons::Unlock : Icons::Lock;
         float lockButtonWidth = 30.0f;
         vec2 windowSize = UI::GetWindowSize();
         vec2 cursorStart = UI::GetCursorPos();
         UI::SetCursorPos(vec2(windowSize.x - lockButtonWidth - 10.0f, cursorStart.y));
         if (UI::Button(lockText, vec2(lockButtonWidth, 0))) {
-            windowResizeable = !windowResizeable;
+            // Check if Shift is held - if so, reset window to default size and lock it
+            if (UI::IsKeyDown(UI::Key::LeftShift) || UI::IsKeyDown(UI::Key::RightShift)) {
+                UI::SetWindowSize(vec2(defaultWidth, defaultHeight));
+                windowResizeable = false;
+            } else {
+                windowResizeable = !windowResizeable;
+            }
         }
         if (UI::IsItemHovered()) {
             UI::BeginTooltip();
-            UI::Text("Lock/Unlock Window Size");
+            if (UI::IsKeyDown(UI::Key::LeftShift) || UI::IsKeyDown(UI::Key::RightShift)) {
+                UI::Text("Reset Window to Default Size");
+            } else {
+                UI::Text("Lock/Unlock Window Size");
+            }
             UI::EndTooltip();
         }
         UI::SetCursorPos(cursorStart);
@@ -184,7 +195,7 @@ void MainMenu() {
                 break;
             }
             case GameState::Playing: {
-                
+                break;
             }
 
             case GameState::GameOver: {
@@ -218,7 +229,7 @@ void MainMenu() {
 
             float labelSize = 20.0f;
 
-            float belowBoardUIHeight = 110.0f;
+            float belowBoardUIHeight = 30.0f;
             float availableHeight = contentRegion.y - belowBoardUIHeight;
 
             float availableWidth = contentRegion.x - moveHistoryWidth - spacing - labelSize - 20.0f;
@@ -265,19 +276,37 @@ void BoardRender() {
     vec2 contentRegion = UI::GetContentRegionAvail();
     float moveHistoryWidth = 150.0f;
     float spacing = 10.0f;
-    float belowBoardUIHeight = 110.0f;
+    float belowBoardUIHeight = 30.0f;
     float availableHeight = contentRegion.y - belowBoardUIHeight;
-    float availableWidth = contentRegion.x - moveHistoryWidth - spacing - labelSize - 20.0f;
+    // contentRegion.x is already the space AFTER Move History panel due to UI::SameLine()
+    float boardPadding = 10.0f; // Small padding on sides
+    float availableWidth = contentRegion.x - labelSize - boardPadding * 2;
+    float minBoardSize = 320.0f; // Minimum 40px per square
     float maxBoardSize = Math::Min(availableWidth, availableHeight);
-    maxBoardSize = Math::Max(maxBoardSize, 80.0f);
+    maxBoardSize = Math::Max(maxBoardSize, minBoardSize);
     if (maxBoardSize > availableHeight) {
         maxBoardSize = availableHeight;
+        maxBoardSize = Math::Max(maxBoardSize, minBoardSize); // Enforce minimum even after height constraint
     }
     float squareSize = maxBoardSize / 8.0f;
     bool flipBoard = (Network::gameId != "" && !Network::isWhite);
 
     vec2 startPos = UI::GetCursorPos();
-    UI::SetCursorPos(vec2(startPos.x + labelSize, startPos.y + labelSize));
+
+    // Total width includes rank labels, board, and small right padding
+    float totalBoardWidth = labelSize + maxBoardSize + boardPadding;
+    float totalBoardHeight = labelSize + maxBoardSize + labelSize; // Top padding + board + file labels
+
+    // Calculate horizontal offset to center the board in available space
+    float horizontalOffset = (contentRegion.x - totalBoardWidth) / 2.0f;
+    horizontalOffset = Math::Max(horizontalOffset, 0.0f); // Ensure non-negative
+
+    // Calculate vertical offset to center the board in available space
+    float verticalOffset = (contentRegion.y - totalBoardHeight) / 2.0f;
+    verticalOffset = Math::Max(verticalOffset, 0.0f); // Ensure non-negative
+
+    // Apply centering offset
+    UI::SetCursorPos(vec2(startPos.x + horizontalOffset + labelSize, startPos.y + verticalOffset + labelSize));
 
     vec2 boardPos = UI::GetCursorPos();
 
@@ -287,12 +316,13 @@ void BoardRender() {
     for (int row = 0; row < 8; row++) {
         string label = flipBoard ? rankLabels[7 - row] : rankLabels[row];
         UI::SetCursorPos(vec2(boardPos.x - labelSize, boardPos.y + row * squareSize + squareSize / 2.0f - 7.0f));
+        UI::Text(label);
     }
 
     array<string> fileLabels = {"a", "b", "c", "d", "e", "f", "g", "h"};
     for (int col = 0; col < 8; col++) {
         string label = flipBoard ? fileLabels[7 - col] : fileLabels[col];
-        UI::SetCursorPos(vec2(boardPos.x + col * squareSize + squareSize / 2.0f - 4.0f, boardPos.y + 8 * squareSize + 2.0f));
+        UI::SetCursorPos(vec2(boardPos.x + col * squareSize + squareSize / 2.0f - 4.0f, boardPos.y + 8 * squareSize + 5.0f));
         UI::Text(label);
     }
     for (int row = 0; row < 8; row++) {
@@ -349,7 +379,7 @@ void BoardRender() {
 
             // 2) Overlay the piece texture using the window draw list (on top of the button)
             UI::Texture@ tex = GetPieceTexture(board[row][col]);
-            ::DrawCenteredImageOverLastItem(tex, 6.0f);
+            DrawCenteredImageOverLastItem(tex, 6.0f);
 
             UI::PopStyleColor(3);
 
