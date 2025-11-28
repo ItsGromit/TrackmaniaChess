@@ -54,13 +54,7 @@ async function onMessage(socket, msg) {
   switch (type) {
     // ----- Lobby flows -----
     case 'create_lobby': {
-      // Generate random 5-letter room code
-      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-      let id = '';
-      for (let i = 0; i < 5; i++) {
-        id += chars.charAt(Math.floor(Math.random() * chars.length));
-      }
-
+      const id = msg.lobbyId || msg.roomCode || Math.random().toString(36).slice(2, 9).toUpperCase();
       const lobby = { id, host: socket, players: [socket], playerNames: [msg.playerName || socket.id], password: msg.password || "", open: true };
       lobbies.set(id, lobby);
       console.log(`[Lobby] Created lobby ${id} for socket ${socket.id}, sending confirmation...`);
