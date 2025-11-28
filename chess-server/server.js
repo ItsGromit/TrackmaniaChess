@@ -12,8 +12,17 @@ const raceChallenges = new Map(); // gameId -> { from, to, mapUid, mapName, defe
 
 // ---------- Utils ----------
 function send(c, obj) {
-  if (!c) return;
-  try { c.write(JSON.stringify(obj) + '\n'); } catch (e) { console.error('write error', e); }
+  if (!c) {
+    console.error('[Send] No socket provided');
+    return;
+  }
+  try {
+    const data = JSON.stringify(obj) + '\n';
+    console.log(`[Send] Sending to ${c.id}:`, obj.type || 'unknown');
+    c.write(data);
+  } catch (e) {
+    console.error('[Send] Write error:', e);
+  }
 }
 function broadcastPlayers(game, obj) {
   if (game.white) send(game.white, obj);
@@ -48,7 +57,10 @@ async function onMessage(socket, msg) {
       const id = (msg.roomCode || Math.random().toString(36).slice(2, 6)).toUpperCase();
       const lobby = { id, host: socket, players: [socket], playerNames: [msg.playerName || socket.id], password: msg.password || "", open: true };
       lobbies.set(id, lobby);
-      send(socket, { type: 'lobby_created', lobbyId: id });
+      console.log(`[Lobby] Created lobby ${id} for socket ${socket.id}, sending confirmation...`);
+      const confirmation = { type: 'lobby_created', lobbyId: id };
+      console.log('[Lobby] Sending confirmation:', JSON.stringify(confirmation));
+      send(socket, confirmation);
       broadcastLobbyList();
       break;
     }
@@ -118,6 +130,7 @@ async function onMessage(socket, msg) {
       // Mark the lobby as "in game" so it doesn't show in the lobby list
       l.open = false;
       broadcastLobbyList();
+      console.log(`[Stats] Active games: ${games.size}, Open lobbies: ${lobbies.size}, Connected clients: ${clients.size}`);
       break;
     }
 

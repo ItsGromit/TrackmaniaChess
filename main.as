@@ -12,10 +12,6 @@ enum MenuTab {
 }
 MenuTab currentMenuTab = MenuTab::Home;
 
-// UI overrides for server host/port (kept from your snippet)
-string ui_serverHost = "";
-string ui_serverPort = "";
-
 // Called by Openplanet on plugin start
 void Main() {
     Network::Init();
@@ -61,8 +57,6 @@ void RenderMenu() {
 
 void Render() {
     if (!showWindow) return;
-
-
 
     EnsurePieceAssetsLoaded();
 

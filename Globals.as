@@ -6,6 +6,10 @@ array<Move@> moveHistory;
 bool gameOver = false;
 string gameResult = "";
 
+// UI overrides for server host/port (kept from your snippet)
+string ui_serverHost = "";
+string ui_serverPort = "";
+
 void InitializeGlobals() {
     @board = array<array<Piece>>(8);
     for (int r = 0; r < 8; r++) {
