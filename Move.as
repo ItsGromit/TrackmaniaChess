@@ -3,7 +3,7 @@ class Move {
     int fromCol;
     int toRow;
     int toCol;
-    Piece capturedPiece;
+    Piece capturePiece;
 
     Move(int fr, int fc, int tr, int tc) {
         fromRow = fr;

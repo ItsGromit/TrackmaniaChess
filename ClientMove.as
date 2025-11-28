@@ -1,39 +1,34 @@
-// Lightweight, client-side move preview only (pseudo-legal).
-// The authoritative server validates real legality and enforces rules.
-
-bool InBounds(int r, int c) { return r >= 0 && r < 8 && c >= 0 && c < 8; }
-
+// Client side visual move preview
+bool InBounds(int r, int c) {
+    return r >= 0 && r < 8 && c >= 0 && c < 8;
+}
 bool SameColor(const Piece &in a, const Piece &in b) {
     if (a.IsEmpty() || b.IsEmpty()) return false;
     return a.color == b.color;
 }
-
 bool IsEmpty(int r, int c) {
     if (!InBounds(r, c)) return false;
     return board[r][c].IsEmpty();
 }
-
 bool IsEnemy(int r, int c, PieceColor me) {
     if (!InBounds(r, c)) return false;
     if (board[r][c].IsEmpty()) return false;
     return board[r][c].color != me;
 }
-
 bool IsPathClear(int r0, int c0, int r1, int c1) {
     int dr = (r1 == r0) ? 0 : (r1 > r0 ? 1 : -1);
     int dc = (c1 == c0) ? 0 : (c1 > c0 ? 1 : -1);
-    int r = r0 + dr, c = c0 + dc;
+    int r = r0 + dr;
+    int c = c0 + dc;
     while (r != r1 || c != c1) {
         if (!IsEmpty(r, c)) return false;
-        r += dr; c += dc;
+        r += dr;
+        c += dc;
     }
     return true;
 }
 
-// ------------------------------------------------------------
-// PSEUDO move test: returns true if piece on (fr,fc) can move to (tr,tc)
-// by basic movement rules only (no king-safety, no pins, no en passant/castling).
-// ------------------------------------------------------------
+// Pseudo move test (only shows movement rules, not every move shown is legal)
 bool IsValidMove(int fr, int fc, int tr, int tc) {
     if (!InBounds(fr, fc) || !InBounds(tr, tc)) return false;
     if (fr == tr && fc == tc) return false;
@@ -94,11 +89,7 @@ bool IsValidMove(int fr, int fc, int tr, int tc) {
     return false;
 }
 
-// ------------------------------------------------------------
-// Simple check detector (for UI only):
-// Find king of `side`, then see if any opponent piece has a pseudo-legal
-// move to that square.
-// ------------------------------------------------------------
+// Simple check detector (client UI only)
 bool IsInCheck(PieceColor side) {
     int kr = -1, kc = -1;
     // locate king
@@ -130,9 +121,7 @@ bool IsInCheck(PieceColor side) {
     return false;
 }
 
-// ------------------------------------------------------------
-// Helper for listing pseudo moves for highlights.
-// ------------------------------------------------------------
+// Move highlight helpers
 class Int2 {
     int x, y;
     Int2() {}

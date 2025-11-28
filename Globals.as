@@ -1,14 +1,35 @@
+// global plugin variables
+bool showWindow = false;
+bool windowResizeable = false;
+enum MenuTab {
+    Home,
+    Play,
+    Settings
+}
+MenuTab currentMenuTab = MenuTab::Home;
+
+// global board variables
 array<array<Piece>>@ board;
-PieceColor currentTurn = PieceColor::White;
-int selectedRow = -1;
-int selectedCol = -1;
+bool gPiecesLoaded = false;
+
+// move history array
 array<Move@> moveHistory;
+
+// game variables
 bool gameOver = false;
 string gameResult = "";
+int currentTurn = PieceColor::White;
+int selectedRow;
+int selectedCol;
+int gSelR = -1;
+int gSelC = -1;
 
-// UI overrides for server host/port (kept from your snippet)
+// server variables
 string ui_serverHost = "";
 string ui_serverPort = "";
+
+// race variables
+uint64 raceStartedAt = 0;
 
 void InitializeGlobals() {
     @board = array<array<Piece>>(8);
@@ -23,7 +44,21 @@ void InitializeGlobals() {
     gameResult = "";
 }
 
-// FEN: "rnbqkbnr/pppppppp/8/... w KQkq - 0 1"
+// Position class
+class Position {
+    int row;
+    int col;
+    Position() {}
+    Position(int r, int c) {
+        row = r;
+        col = c;
+    }
+    bool opEquals(const Position &in o) const {
+        return row == o.row && col == o.col;
+    }
+}
+
+// FEN
 void ApplyFEN(const string &in fen, const string &in turnLetter="w") {
     if (board is null || board.Length != 8) InitializeGlobals();
 
@@ -36,14 +71,14 @@ void ApplyFEN(const string &in fen, const string &in turnLetter="w") {
     for (int r = 0; r < 8; r++)
         for (int c = 0; c < 8; c++)
             board[r][c] = Piece();
+    
 
     // ranks come 8..1
     for (int r = 0; r < 8; r++) {
         string seg = ranks[r];
         int c = 0;
         for (int i = 0; i < int(seg.Length) && c < 8; i++) {
-            string ch = seg.SubStr(i, 1); // single char as string
-            // digit: N empty squares
+            string ch = seg.SubStr(i, 1);
             if (ch >= "1" && ch <= "8") {
                 int empty = Text::ParseInt(ch);
                 for (int k = 0; k < empty && c < 8; k++) board[r][c++] = Piece();
@@ -53,9 +88,9 @@ void ApplyFEN(const string &in fen, const string &in turnLetter="w") {
             board[r][c++] = PieceFromFENChar(ch);
         }
     }
-
     // active color
     currentTurn = (turnLetter.ToLower() == "b") ? PieceColor::Black : PieceColor::White;
+    
 }
 
 // Accept single-character string; easier in AngelScript than uint codepoints

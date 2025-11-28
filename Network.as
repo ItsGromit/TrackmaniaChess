@@ -3,23 +3,30 @@ namespace Network {
     bool isConnected = false;
 
     [Setting category="Network" name="Server host"] string serverHost = "yamanote.proxy.rlwy.net";
-    [Setting category="Network" name="Server port"] uint   serverPort = 36621;
+    [Setting category="Network" name="Server port"] uint serverPort = 36621;
 
+    // =================
+    // Network variables
+    // =================
+    
     string playerId;
     string currentLobbyId;
+    string currentLobbyPassword;
     string gameId;
-    bool   isWhite = false;
-    bool   isHost  = false;
+    bool isWhite = false;
+    bool isHost = false;
 
-    // Race challenge state
+    // ==============
+    // Race variables
+    // ==============
     string raceMapUid = "";
     string raceMapName = "";
-    bool   isDefender = false;  // true if you're defending (race first)
-    int    defenderTime = -1;   // Defender's race time in ms
-    string captureFrom = "";    // Algebraic notation of attacking piece
-    string captureTo = "";      // Algebraic notation of target square
+    bool isDefender = false;
+    int defenderTime = -1;
+    string captureFrom = "";
+    string captureTo = "";
 
-    const array<string> FILES = {"a","b","c","d","e","f","g","h"};
+    const array<string> FILES = {"a", "b", "c", "d", "e", "f", "g", "h"};
 
     string GetLocalPlayerName() {
         auto app = GetApp();
@@ -30,38 +37,42 @@ namespace Network {
     }
 
     class Lobby {
-        string id;
-        string hostId;
-        int    players;
-        bool   open;
-        bool   hasPassword;
-        string password;
+        string  id;
+        string  hostId;
+        int     players;
+        bool    open;
+        bool    hasPassword;
+        string  password;
         array<string> playerNames;
     }
     array<Lobby> lobbies;
 
     string _buf;
 
+    // ====================
+    // Connection functions
+    // ====================
     void Init() {
         @sock = Net::Socket();
     }
-
+    // Connect bool
     bool Connect() {
         if (sock is null) Init();
         bool ok = sock.Connect(serverHost, uint16(serverPort));
         isConnected = ok;
         return ok;
     }
-
+    // Disconnect function
     void Disconnect() {
         if (sock !is null) sock.Close();
         isConnected = false;
         _buf = "";
         gameId = "";
         currentLobbyId = "";
+        currentLobbyPassword = "";
         lobbies.Resize(0);
     }
-
+    // Update function
     void Update() {
         if (!isConnected || sock is null) return;
 
@@ -88,29 +99,44 @@ namespace Network {
             }
         }
     }
-
+    // Send JSON function
     void SendJson(Json::Value &in j) {
         if (!isConnected || sock is null) return;
         sock.WriteRaw(Json::Write(j) + "\n");
     }
 
-    // ---------- Lobby ----------
+    // ===============
+    // Lobby functions
+    // ===============
     void ListLobbies() {
-        Json::Value j = Json::Object(); j["type"] = "list_lobbies"; SendJson(j);
+        Json::Value j = Json::Object();
+        j["type"] = "list_lobbies";
+        SendJson(j);
     }
-
+    // Create lobby
     void CreateLobby(const string &in roomCode = "", const string &in password = "", const string &in playerName = "") {
         Json::Value j = Json::Object();
         j["type"] = "create_lobby";
-        if (roomCode.Length > 0) j["roomCode"] = roomCode;
+
+        // Generate random 5-letter room code if not provided
+        string code = roomCode;
+        if (code.Length == 0) {
+            const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+            for (uint i = 0; i < 5; i++) {
+                uint index = Math::Rand(0, chars.Length);
+                code += chars.SubStr(index, 1);
+            }
+        }
+
+        j["lobbyId"] = code;
         if (password.Length > 0) j["password"] = password;
         // Get local player name
         string name = playerName.Length > 0 ? playerName : GetLocalPlayerName();
         j["playerName"] = name;
-        print("[Chess] Creating lobby - RoomCode: " + (roomCode.Length > 0 ? roomCode : "none") + ", HasPassword: " + (password.Length > 0 ? "yes" : "no") + ", Player: " + name);
+        print("[Chess] Creating lobby - RoomCode: " + code + ", HasPassword: " + (password.Length > 0 ? "yes" : "no") + ", Player: " + name);
         SendJson(j);
     }
-
+    // Join lobby
     void JoinLobby(const string &in lobbyId, const string &in password = "", const string &in playerName = "") {
         if (lobbyId.Length == 0) return;
         Json::Value j = Json::Object();
@@ -122,7 +148,7 @@ namespace Network {
         j["playerName"] = name;
         SendJson(j);
     }
-
+    // Leave lobby (will close lobby if you are the host)
     void LeaveLobby() {
         if (currentLobbyId.Length == 0) return;
         Json::Value j = Json::Object();
@@ -130,9 +156,10 @@ namespace Network {
         j["lobbyId"] = currentLobbyId;
         SendJson(j);
         currentLobbyId = "";
+        currentLobbyPassword = "";
         isHost = false;
     }
-
+    // Start game in current lobby
     void StartGame(const string &in lobbyId="") {
         string id = lobbyId.Length > 0 ? lobbyId : currentLobbyId;
         if (id.Length == 0) return;
@@ -142,7 +169,9 @@ namespace Network {
         SendJson(j);
     }
 
-    // ---------- Gameplay ----------
+    // ==================
+    // Gameplay functions
+    // ==================
     void SendMove(const string &in fromAlg, const string &in toAlg, const string &in promo="q") {
         if (gameId.Length == 0) return;
         Json::Value j = Json::Object();
@@ -153,7 +182,7 @@ namespace Network {
         if (promo.Length > 0) j["promo"] = promo;
         SendJson(j);
     }
-
+    // Forfeit
     void Resign() {
         print("[Chess] Resign called - gameId: " + (gameId.Length > 0 ? gameId : "EMPTY"));
         if (gameId.Length == 0) {
@@ -166,7 +195,7 @@ namespace Network {
         j["gameId"] = gameId;
         SendJson(j);
     }
-
+    // New game request (with previous gameId)
     void RequestNewGame() {
         print("[Chess] RequestNewGame called - gameId: " + (gameId.Length > 0 ? gameId : "EMPTY"));
         if (gameId.Length == 0) {
@@ -179,7 +208,7 @@ namespace Network {
         j["gameId"] = gameId;
         SendJson(j);
     }
-
+    // Send race result
     void SendRaceResult(int timeMs) {
         if (gameId.Length == 0) return;
         Json::Value j = Json::Object();
@@ -189,7 +218,7 @@ namespace Network {
         print("[Chess] Sending race result: " + timeMs + "ms");
         SendJson(j);
     }
-
+    // Retire from race (player doesn't finish the track)
     void RetireFromRace() {
         if (gameId.Length == 0) return;
         Json::Value j = Json::Object();
@@ -199,9 +228,10 @@ namespace Network {
         SendJson(j);
     }
 
-    // ---------- Messages ----------
+    // ========
+    // Messages
+    // ========
     void HandleMsg(Json::Value &msg) {
-        // Safety check: ensure msg is valid
         if (msg.GetType() != Json::Type::Object) {
             print("Network::HandleMsg - Invalid message type: " + msg.GetType());
             return;
@@ -236,7 +266,7 @@ namespace Network {
         else if (t == "lobby_created") {
             currentLobbyId = string(msg["lobbyId"]);
             isHost = true;
-            print("[Chess] Lobby created successfully - LobbyId: " + currentLobbyId);
+            print("[Chess Race] Lobby successfully created - LobbyId: " + currentLobbyId);
             GameManager::currentState = GameState::InLobby;
         }
         else if (t == "lobby_update") {
@@ -267,8 +297,7 @@ namespace Network {
             ApplyFEN(fen, turn);
             GameManager::currentState = GameState::Playing;
             print("[Chess] Game state updated to Playing");
-        }
-        else if (t == "moved") {
+        } else if (t == "moved") {
             string fen  = string(msg["fen"]);
             string turn = string(msg["turn"]);
 
@@ -286,8 +315,7 @@ namespace Network {
             }
 
             ApplyFEN(fen, turn);
-        }
-        else if (t == "game_over") {
+        } else if (t == "game_over") {
             string reason = string(msg["reason"]);
             string winner = msg.HasKey("winner") ? string(msg["winner"]) : "none";
             print("[Chess] Game over - reason: " + reason + ", winner: " + winner + ", gameId: " + gameId);
@@ -295,10 +323,7 @@ namespace Network {
             gameOver = true;
             gameResult = (winner.Length > 0 ? winner : "none") + " — " + reason;
             print("[Chess] gameId preserved for rematch: " + gameId);
-            // Don't clear gameId here so rematch can use it
-        }
-        else if (t == "race_challenge") {
-            // A capture attempt triggers a race
+        } else if (t == "race_challenge") {
             raceMapUid = string(msg["mapUid"]);
             raceMapName = msg.HasKey("mapName") ? string(msg["mapName"]) : "Unknown Map";
             isDefender = bool(msg["isDefender"]);
@@ -311,13 +336,11 @@ namespace Network {
 
             // Reset race state in main.as via external variable
             raceStartedAt = Time::Now;
-        }
-        else if (t == "race_defender_finished") {
+        } else if (t == "race_defender_finished") {
             // Defender finished their race
             defenderTime = int(msg["time"]);
             print("[Chess] Defender finished race in " + defenderTime + "ms");
-        }
-        else if (t == "race_result") {
+        } else if (t == "race_result") {
             // Race completed, apply the result
             bool captureSucceeded = bool(msg["captureSucceeded"]);
             string fen = string(msg["fen"]);
@@ -336,8 +359,7 @@ namespace Network {
             defenderTime = -1;
             captureFrom = "";
             captureTo = "";
-        }
-        else if (t == "error") {
+        } else if (t == "error") {
             UI::ShowNotification("Chess", "Error: " + string(msg["code"]), vec4(1,0.4,0.4,1), 4000);
         }
     }
@@ -356,7 +378,6 @@ namespace Network {
         string file = alg.SubStr(0, 1).ToLower();
         string rankStr = alg.SubStr(1, 1);
 
-        // Convert file (a-h) to column (0-7)
         col = -1;
         for (uint i = 0; i < FILES.Length; i++) {
             if (FILES[i] == file) {
@@ -366,7 +387,6 @@ namespace Network {
         }
         if (col < 0 || col > 7) return false;
 
-        // Convert rank (1-8) to row (7-0)
         int rank = Text::ParseInt(rankStr);
         if (rank < 1 || rank > 8) return false;
         row = 8 - rank;
