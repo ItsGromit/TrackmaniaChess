@@ -114,7 +114,7 @@ namespace Lobby {
             }
             if (UI::Button("Leave Lobby")) {
                 Network::LeaveLobby();
-                GameManager::currentState = GameState::InQueue;
+                GameManager::currentState = GameState::Menu;
             }
             break;
         }

@@ -126,7 +126,13 @@ function handleStartGame(socket, msg) {
   const chess = new Chess();
   const p1 = l.players[0];
   const p2 = l.players.length >= 2 ? l.players[1] : null;
-  const game = { white: p1, black: p2, chess, createdAt: Date.now(), mapFilters: l.mapFilters || {} };
+
+  // Randomly assign colors
+  const p1IsWhite = Math.random() < 0.5;
+  const white = p1IsWhite ? p1 : p2;
+  const black = p1IsWhite ? p2 : p1;
+
+  const game = { white, black, chess, createdAt: Date.now(), mapFilters: l.mapFilters || {} };
   games.set(gameId, game);
 
   // Store opponents for rematch
@@ -138,7 +144,7 @@ function handleStartGame(socket, msg) {
   send(p1, {
     type: 'game_start',
     gameId,
-    isWhite: true,
+    isWhite: p1IsWhite,
     opponentId: p2 ? p2.id : null,
     fen: chess.fen(),
     turn: 'w'
@@ -147,7 +153,7 @@ function handleStartGame(socket, msg) {
     send(p2, {
       type: 'game_start',
       gameId,
-      isWhite: false,
+      isWhite: !p1IsWhite,
       opponentId: p1.id,
       fen: chess.fen(),
       turn: 'w'

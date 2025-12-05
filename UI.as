@@ -17,35 +17,11 @@ void MainMenu() {
 
     if (UI::Begin("Chess Race", showWindow, windowFlags)) {
 
-        string lockText = windowResizeable ? Icons::Unlock : Icons::Lock;
-        float lockButtonWidth = 30.0f;
-        vec2 windowSize = UI::GetWindowSize();
-        vec2 cursorStart = UI::GetCursorPos();
-        UI::SetCursorPos(vec2(windowSize.x - lockButtonWidth - 10.0f, cursorStart.y));
-        if (UI::Button(lockText, vec2(lockButtonWidth, 0))) {
-            // Check if Shift is held - if so, reset window to default size and lock it
-            if (UI::IsKeyDown(UI::Key::LeftShift) || UI::IsKeyDown(UI::Key::RightShift)) {
-                UI::SetWindowSize(vec2(defaultWidth, defaultHeight));
-                windowResizeable = false;
-            } else {
-                windowResizeable = !windowResizeable;
-            }
-        }
-        if (UI::IsItemHovered()) {
-            UI::BeginTooltip();
-            if (UI::IsKeyDown(UI::Key::LeftShift) || UI::IsKeyDown(UI::Key::RightShift)) {
-                UI::Text("Reset Window to Default Size");
-            } else {
-                UI::Text("Lock/Unlock Window Size");
-            }
-            UI::EndTooltip();
-        }
-        UI::SetCursorPos(cursorStart);
-
         switch (GameManager::currentState) {
             case GameState::Menu: {
                 // navigation bar
                 float tabButtonWidth = 80.0f;
+                float lockButtonWidth = 30.0f;
 
                 // Home tab
                 vec4 homeColor = currentMenuTab == MenuTab::Home ? vec4(0.2f, 0.5f, 0.8f, 1.0f) : vec4(0.26f, 0.26f, 0.26f, 1.0f);
@@ -74,6 +50,32 @@ void MainMenu() {
                     currentMenuTab = MenuTab::Settings;
                 }
                 UI::PopStyleColor();
+
+                UI::SameLine();
+
+                // Lock/Unlock button aligned with navigation bar
+                vec2 availRegion = UI::GetContentRegionAvail();
+                vec2 currentCursorPos = UI::GetCursorPos();
+                UI::SetCursorPos(vec2(currentCursorPos.x + availRegion.x - lockButtonWidth, currentCursorPos.y));
+                string lockText = windowResizeable ? Icons::Unlock : Icons::Lock;
+                if (UI::Button(lockText, vec2(lockButtonWidth, 30.0f))) {
+                    // Check if Shift is held - if so, reset window to default size and lock it
+                    if (UI::IsKeyDown(UI::Key::LeftShift) || UI::IsKeyDown(UI::Key::RightShift)) {
+                        UI::SetWindowSize(vec2(defaultWidth, defaultHeight));
+                        windowResizeable = false;
+                    } else {
+                        windowResizeable = !windowResizeable;
+                    }
+                }
+                if (UI::IsItemHovered()) {
+                    UI::BeginTooltip();
+                    if (UI::IsKeyDown(UI::Key::LeftShift) || UI::IsKeyDown(UI::Key::RightShift)) {
+                        UI::Text("Reset Window to Default Size");
+                    } else {
+                        UI::Text("Lock/Unlock Window Size");
+                    }
+                    UI::EndTooltip();
+                }
 
                 UI::Separator();
                 UI::NewLine();
@@ -166,13 +168,78 @@ void MainMenu() {
             }
             // Connecting
             case GameState::Connecting: {
+                // Top bar with lock button - same height as menu navigation
+                float lockButtonWidth = 30.0f;
+                float barHeight = 30.0f;
+                vec2 contentAvail = UI::GetContentRegionAvail();
+                vec2 lockCursor = UI::GetCursorPos();
+
+                // Lock button at right
+                UI::SetCursorPos(vec2(lockCursor.x + contentAvail.x - lockButtonWidth, lockCursor.y));
+                string lockText = windowResizeable ? Icons::Unlock : Icons::Lock;
+                if (UI::Button(lockText + "##connecting", vec2(lockButtonWidth, barHeight))) {
+                    if (UI::IsKeyDown(UI::Key::LeftShift) || UI::IsKeyDown(UI::Key::RightShift)) {
+                        UI::SetWindowSize(vec2(defaultWidth, defaultHeight));
+                        windowResizeable = false;
+                    } else {
+                        windowResizeable = !windowResizeable;
+                    }
+                }
+                if (UI::IsItemHovered()) {
+                    UI::BeginTooltip();
+                    if (UI::IsKeyDown(UI::Key::LeftShift) || UI::IsKeyDown(UI::Key::RightShift)) {
+                        UI::Text("Reset Window to Default Size");
+                    } else {
+                        UI::Text("Lock/Unlock Window Size");
+                    }
+                    UI::EndTooltip();
+                }
+
+                // Reset cursor and add dummy invisible item to maintain bar height
+                UI::SetCursorPos(lockCursor);
+                UI::Dummy(vec2(0, barHeight));
+
+                UI::Separator();
+                UI::NewLine();
+
                 UI::Text("Connecting to server...");
                 break;
             }
-            // In queue (depricated)
+            // In Queue (Depricated)
             case GameState::InQueue: {
-                UI::Text("Lobby Browser");
+                // Top bar with lock button - same height as menu navigation
+                float lockButtonWidth = 30.0f;
+                float barHeight = 30.0f;
+                vec2 contentAvail = UI::GetContentRegionAvail();
+                vec2 lockCursor = UI::GetCursorPos();
+
+                // Lock button at right
+                UI::SetCursorPos(vec2(lockCursor.x + contentAvail.x - lockButtonWidth, lockCursor.y));
+                string lockText = windowResizeable ? Icons::Unlock : Icons::Lock;
+                if (UI::Button(lockText + "##queue", vec2(lockButtonWidth, barHeight))) {
+                    if (UI::IsKeyDown(UI::Key::LeftShift) || UI::IsKeyDown(UI::Key::RightShift)) {
+                        UI::SetWindowSize(vec2(defaultWidth, defaultHeight));
+                        windowResizeable = false;
+                    } else {
+                        windowResizeable = !windowResizeable;
+                    }
+                }
+                if (UI::IsItemHovered()) {
+                    UI::BeginTooltip();
+                    if (UI::IsKeyDown(UI::Key::LeftShift) || UI::IsKeyDown(UI::Key::RightShift)) {
+                        UI::Text("Reset Window to Default Size");
+                    } else {
+                        UI::Text("Lock/Unlock Window Size");
+                    }
+                    UI::EndTooltip();
+                }
+
+                // Reset cursor and add dummy invisible item to maintain bar height
+                UI::SetCursorPos(lockCursor);
+                UI::Dummy(vec2(0, barHeight));
+
                 UI::Separator();
+                UI::NewLine();
 
                 // Render create lobby UI
                 Lobby::RenderCreateLobby();
@@ -187,8 +254,43 @@ void MainMenu() {
             }
             // In Lobby
             case GameState::InLobby: {
-                UI::Text("\\$0f0Lobby");
+                // Top bar with lock button - same height as menu navigation
+                float lockButtonWidth = 30.0f;
+                float barHeight = 30.0f;
+                vec2 contentAvail = UI::GetContentRegionAvail();
+                vec2 lockCursor = UI::GetCursorPos();
+
+                // Lock button at right
+                UI::SetCursorPos(vec2(lockCursor.x + contentAvail.x - lockButtonWidth, lockCursor.y));
+                string lockText = windowResizeable ? Icons::Unlock : Icons::Lock;
+                if (UI::Button(lockText + "##lobby", vec2(lockButtonWidth, barHeight))) {
+                    if (UI::IsKeyDown(UI::Key::LeftShift) || UI::IsKeyDown(UI::Key::RightShift)) {
+                        UI::SetWindowSize(vec2(defaultWidth, defaultHeight));
+                        windowResizeable = false;
+                    } else {
+                        windowResizeable = !windowResizeable;
+                    }
+                }
+                if (UI::IsItemHovered()) {
+                    UI::BeginTooltip();
+                    if (UI::IsKeyDown(UI::Key::LeftShift) || UI::IsKeyDown(UI::Key::RightShift)) {
+                        UI::Text("Reset Window to Default Size");
+                    } else {
+                        UI::Text("Lock/Unlock Window Size");
+                    }
+                    UI::EndTooltip();
+                }
+
+                // Reset cursor and add "Lobby" label as a button-style element
+                UI::SetCursorPos(lockCursor);
+                UI::PushStyleColor(UI::Col::Button, vec4(0.2f, 0.5f, 0.8f, 1.0f));
+                UI::PushStyleColor(UI::Col::ButtonHovered, vec4(0.2f, 0.5f, 0.8f, 1.0f));
+                UI::PushStyleColor(UI::Col::ButtonActive, vec4(0.2f, 0.5f, 0.8f, 1.0f));
+                UI::Button("Lobby", vec2(80.0f, barHeight));
+                UI::PopStyleColor(3);
+
                 UI::Separator();
+                UI::NewLine();
 
                 // Render the current lobby details
                 Lobby::RenderCurrentLobby();
@@ -204,19 +306,57 @@ void MainMenu() {
         }
 
         if (GameManager::currentState == GameState::Playing || GameManager::currentState == GameState::GameOver) {
+            // Top bar with lock button - same height as menu navigation
+            float lockButtonWidth = 30.0f;
+            float barHeight = 30.0f;
+            vec2 contentAvail = UI::GetContentRegionAvail();
+            vec2 lockCursor = UI::GetCursorPos();
+
+            // Lock button at right
+            UI::SetCursorPos(vec2(lockCursor.x + contentAvail.x - lockButtonWidth, lockCursor.y));
+            string lockText = windowResizeable ? Icons::Unlock : Icons::Lock;
+            if (UI::Button(lockText + "##playing", vec2(lockButtonWidth, barHeight))) {
+                if (UI::IsKeyDown(UI::Key::LeftShift) || UI::IsKeyDown(UI::Key::RightShift)) {
+                    UI::SetWindowSize(vec2(defaultWidth, defaultHeight));
+                    windowResizeable = false;
+                } else {
+                    windowResizeable = !windowResizeable;
+                }
+            }
+            if (UI::IsItemHovered()) {
+                UI::BeginTooltip();
+                if (UI::IsKeyDown(UI::Key::LeftShift) || UI::IsKeyDown(UI::Key::RightShift)) {
+                    UI::Text("Reset Window to Default Size");
+                } else {
+                    UI::Text("Lock/Unlock Window Size");
+                }
+                UI::EndTooltip();
+            }
+
+            // Reset cursor and add dummy invisible item to maintain bar height
+            UI::SetCursorPos(lockCursor);
+            UI::Dummy(vec2(0, barHeight));
+
+            UI::Separator();
+
             // Game info
             string turnText = (currentTurn == PieceColor::White) ? "\\$fffWhite" : "\\$666Black";
             UI::Text("Turn: " + turnText);
+            UI::SameLine();
 
             if (!GameManager::isLocalPlayerTurn()) {
+                UI::SameLine();
                 UI::Text("\\$ff0Waiting for opponent's move...");
             } else {
+                UI::SameLine();
                 UI::Text("");
             }
             if (IsInCheck(PieceColor(currentTurn))) {
+                UI::SameLine();
                 UI::Text("\\$f00CHECK!");
             }
             if (gameOver) {
+                UI::SameLine();
                 UI::Text("\\$ff0Game over!" + gameResult);
             }
 
@@ -245,7 +385,8 @@ void MainMenu() {
 
             bool flipBoard = (Network::gameId != "" && !Network::isWhite);
 
-            UI::BeginChild("MoveHistory", vec2(moveHistoryWidth, availableHeight + belowBoardUIHeight), true);
+            UI::BeginGroup();
+            UI::BeginChild("MoveHistory", vec2(moveHistoryWidth, availableHeight), true);
             UI::Text("Move History:");
             UI::Separator();
             for (uint i = 0; i < moveHistory.Length; i++) {
@@ -256,6 +397,20 @@ void MainMenu() {
                 UI::Text(moveText);
             }
             UI::EndChild();
+
+            // Forfeit button below move history, aligned with it
+            if (GameManager::currentState == GameState::Playing && !gameOver) {
+                vec2 buttonCursor = UI::GetCursorPos();
+                UI::SetCursorPos(vec2(buttonCursor.x, buttonCursor.y - 10.0f));
+                UI::PushStyleColor(UI::Col::Button, vec4(0.8f, 0.2f, 0.2f, 1.0f));
+                UI::PushStyleColor(UI::Col::ButtonHovered, vec4(1.0f, 0.3f, 0.3f, 1.0f));
+                UI::PushStyleColor(UI::Col::ButtonActive, vec4(0.6f, 0.1f, 0.1f, 1.0f));
+                if (UI::Button("Forfeit", vec2(moveHistoryWidth, belowBoardUIHeight))) {
+                    Network::Resign();
+                }
+                UI::PopStyleColor(3);
+            }
+            UI::EndGroup();
 
             UI::SameLine();
 
