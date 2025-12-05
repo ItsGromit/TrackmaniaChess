@@ -1,0 +1,16 @@
+// state.js - Game state management
+
+// State storage
+const games = new Map();     // gameId -> { white:Socket, black:Socket, chess:Chess, createdAt:number, mapFilters:Object }
+const lobbies = new Map();   // lobbyId -> { id, host:Socket, players:Socket[], playerNames:string[], password:string, open:boolean, mapFilters:Object }
+const clients = new Set();   // connected sockets
+const lastOpponents = new Map(); // socket -> opponent socket (for rematch after game ends)
+const raceChallenges = new Map(); // gameId -> { from, to, mapUid, mapName, defenderTime, defenderSocket, attackerSocket }
+
+module.exports = {
+  games,
+  lobbies,
+  clients,
+  lastOpponents,
+  raceChallenges
+};
