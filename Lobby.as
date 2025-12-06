@@ -5,22 +5,50 @@ namespace Lobby {
     string createLobbyRoomCode = "";
     string joinLobbyPassword = "";
     string selectedLobbyId = "";
+    bool showCreateRoomSection = false;
 
     void RenderCreateLobby() {
-        UI::Text("Create Room");
-        UI::Text("Input password(optional)");
-        UI::SetNextItemWidth(200);
-        createLobbyPassword = UI::InputText("Password (optional)", createLobbyPassword);
-
-        if (UI::Button("Create Room")) {
-            Network::CreateLobby("", createLobbyPassword);
-            createLobbyPassword = "";
-            GameManager::currentState = GameState::InLobby;
+        // Create Room toggle button
+        string toggleIcon = showCreateRoomSection ? Icons::ChevronDown : Icons::ChevronRight;
+        if (UI::Button(toggleIcon + " Create Room", vec2(200.0f, 30.0f))) {
+            showCreateRoomSection = !showCreateRoomSection;
         }
-        UI::SameLine();
-        if (UI::Button("Refresh")) {
+
+        UI::Separator();
+
+        // Show expanded section if toggled
+        if (showCreateRoomSection) {
+            UI::NewLine();
+
+            UI::Text("Password (optional):");
+            UI::SetNextItemWidth(200);
+            createLobbyPassword = UI::InputText("##password", createLobbyPassword);
+            UI::NewLine();
+
+            if (UI::Button("Create Room", vec2(150.0f, 30.0f))) {
+                Network::CreateLobby("", createLobbyPassword);
+                createLobbyPassword = "";
+                showCreateRoomSection = false;
+                GameManager::currentState = GameState::InLobby;
+            }
+
+            UI::SameLine();
+
+            if (UI::Button("Cancel", vec2(150.0f, 30.0f))) {
+                showCreateRoomSection = false;
+                createLobbyPassword = "";
+            }
+
+            UI::NewLine();
+            UI::Separator();
+        }
+
+        // Refresh button always visible
+        UI::NewLine();
+        if (UI::Button("Refresh Lobby List", vec2(200.0f, 30.0f))) {
             Network::ListLobbies();
         }
+        UI::NewLine();
         UI::Separator();
     }
 
@@ -79,22 +107,31 @@ namespace Lobby {
             if (l.id != Network::currentLobbyId) continue;
 
             foundLobby = true;
-            UI::Text("\\$ff0Room Code: " + l.id);
+
+            // Room Code section
+            UI::Text(themeSectionLabelColor + "Room Code:");
+            UI::Text(l.id);
             UI::SameLine();
             if (UI::Button("Copy##roomcode")) {
                 IO::SetClipboard(l.id);
             }
+            UI::NewLine();
 
+            // Password section (if applicable)
             if (l.hasPassword && Network::currentLobbyPassword.Length > 0) {
-                UI::Text("Password: " + Network::currentLobbyPassword);
+                UI::Text(themeSectionLabelColor + "Password:");
+                UI::Text(Network::currentLobbyPassword);
                 UI::SameLine();
                 if (UI::Button("Copy##password")) {
                     IO::SetClipboard(Network::currentLobbyPassword);
                 }
+                UI::NewLine();
             }
 
-            UI::BeginChild("LobbyPlayers", vec2(0, 100));
-            UI::Text("\\$0f0Players in Lobby:");
+            // Players section
+            UI::Text(themeSuccessTextColor + "Players in Lobby:");
+            UI::Separator();
+            UI::BeginChild("LobbyPlayers", vec2(0, 120), true);
             for (uint j = 0; j < l.playerNames.Length; j++) {
                 string playerName = l.playerNames[j];
                 // The first player in the list is the host
@@ -106,13 +143,16 @@ namespace Lobby {
             }
             UI::EndChild();
 
+            UI::NewLine();
+
+            // Action buttons
             if (Network::isHost) {
-                if (UI::Button("Start Game")) {
+                if (UI::Button("Start Game", vec2(150.0f, 30.0f))) {
                     Network::StartGame();
                 }
                 UI::SameLine();
             }
-            if (UI::Button("Leave Lobby")) {
+            if (UI::Button("Leave Lobby", vec2(150.0f, 30.0f))) {
                 Network::LeaveLobby();
                 GameManager::currentState = GameState::Menu;
             }
@@ -121,21 +161,24 @@ namespace Lobby {
 
         // If lobby not found in list yet, show basic info
         if (!foundLobby) {
-            UI::Text("\\$ff0Room Code: " + Network::currentLobbyId);
+            UI::Text(themeSectionLabelColor + "Room Code:");
+            UI::Text(Network::currentLobbyId);
             UI::SameLine();
             if (UI::Button("Copy##roomcode")) {
                 IO::SetClipboard(Network::currentLobbyId);
             }
+            UI::NewLine();
 
-            UI::Text("\\$0f0Waiting for lobby details...");
+            UI::Text(themeSuccessTextColor + "Waiting for lobby details...");
+            UI::NewLine();
 
-            if (UI::Button("Refresh")) {
+            if (UI::Button("Refresh", vec2(150.0f, 30.0f))) {
                 Network::ListLobbies();
             }
             UI::SameLine();
-            if (UI::Button("Leave Lobby")) {
+            if (UI::Button("Leave Lobby", vec2(150.0f, 30.0f))) {
                 Network::LeaveLobby();
-                GameManager::currentState = GameState::InQueue;
+                GameManager::currentState = GameState::Menu;
             }
         }
     }

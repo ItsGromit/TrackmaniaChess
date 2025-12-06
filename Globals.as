@@ -11,6 +11,25 @@ vec2 screenSize = vec2(Draw::GetWidth(), Draw::GetHeight());
 float defaultHeight = screenSize.y * 0.6f;
 float defaultWidth = defaultHeight * 1.05f;
 
+// Theme colors - can be customized by user
+[Setting category="Theme" name="Active Tab Color"]
+vec4 themeActiveTabColor = vec4(0.2f, 0.5f, 0.8f, 1.0f);
+
+[Setting category="Theme" name="Inactive Tab Color"]
+vec4 themeInactiveTabColor = vec4(0.26f, 0.26f, 0.26f, 1.0f);
+
+[Setting category="Theme" name="Section Label Color (Hex)"]
+string themeSectionLabelColor = "\\$f80";
+
+[Setting category="Theme" name="Success Text Color (Hex)"]
+string themeSuccessTextColor = "\\$0f0";
+
+[Setting category="Theme" name="Warning Text Color (Hex)"]
+string themeWarningTextColor = "\\$ff0";
+
+[Setting category="Theme" name="Error Text Color (Hex)"]
+string themeErrorTextColor = "\\$f00";
+
 // global board variables
 array<array<Piece>>@ board;
 bool gPiecesLoaded = false;

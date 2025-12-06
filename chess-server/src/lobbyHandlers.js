@@ -46,7 +46,12 @@ function handleJoinLobby(socket, msg) {
   if (!l) return send(socket, { type: 'lobby_error', message: 'Lobby not found' });
   if (!l.open) return send(socket, { type: 'lobby_error', message: 'Lobby closed' });
   if (l.password && l.password !== (msg.password || "")) return send(socket, { type: 'lobby_error', message: 'Incorrect password' });
+
+  // Failsafe: Ensure maximum 2 players in a lobby
   if (!l.players.includes(socket)) {
+    if (l.players.length >= 2) {
+      return send(socket, { type: 'error', code: 'LOBBY_FULL', message: 'Lobby is full (maximum 2 players)' });
+    }
     l.players.push(socket);
     l.playerNames.push(msg.playerName || socket.id);
   }

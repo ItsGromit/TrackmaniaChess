@@ -24,32 +24,35 @@ void MainMenu() {
                 float lockButtonWidth = 30.0f;
 
                 // Home tab
-                vec4 homeColor = currentMenuTab == MenuTab::Home ? vec4(0.2f, 0.5f, 0.8f, 1.0f) : vec4(0.26f, 0.26f, 0.26f, 1.0f);
+                vec4 homeColor = currentMenuTab == MenuTab::Home ? themeActiveTabColor : themeInactiveTabColor;
                 UI::PushStyleColor(UI::Col::Button, homeColor);
+                UI::PushStyleColor(UI::Col::ButtonActive, themeActiveTabColor);
                 if (UI::Button("Home", vec2(tabButtonWidth, 30.0f))) {
                     currentMenuTab = MenuTab::Home;
                 }
-                UI::PopStyleColor();
+                UI::PopStyleColor(2);
 
                 UI::SameLine();
 
                 // Play tab
-                vec4 playColor = currentMenuTab == MenuTab::Play ? vec4(0.2f, 0.5f, 0.8f, 1.0f) : vec4(0.26f, 0.26f, 0.26f, 1.0f);
+                vec4 playColor = currentMenuTab == MenuTab::Play ? themeActiveTabColor : themeInactiveTabColor;
                 UI::PushStyleColor(UI::Col::Button, playColor);
+                UI::PushStyleColor(UI::Col::ButtonActive, themeActiveTabColor);
                 if (UI::Button("Play", vec2(tabButtonWidth, 30.0f))) {
                     currentMenuTab = MenuTab::Play;
                 }
-                UI::PopStyleColor();
+                UI::PopStyleColor(2);
 
                 UI::SameLine();
 
                 // Settings tab
-                vec4 settingsColor = currentMenuTab == MenuTab::Settings ? vec4(0.2f, 0.5f, 0.8f, 1.0f) : vec4(0.26f, 0.26f, 0.26f, 1.0f);
+                vec4 settingsColor = currentMenuTab == MenuTab::Settings ? themeActiveTabColor : themeInactiveTabColor;
                 UI::PushStyleColor(UI::Col::Button, settingsColor);
+                UI::PushStyleColor(UI::Col::ButtonActive, themeActiveTabColor);
                 if (UI::Button("Settings", vec2(tabButtonWidth, 30.0f))) {
                     currentMenuTab = MenuTab::Settings;
                 }
-                UI::PopStyleColor();
+                UI::PopStyleColor(2);
 
                 UI::SameLine();
 
@@ -283,9 +286,9 @@ void MainMenu() {
 
                 // Reset cursor and add "Lobby" label as a button-style element
                 UI::SetCursorPos(lockCursor);
-                UI::PushStyleColor(UI::Col::Button, vec4(0.2f, 0.5f, 0.8f, 1.0f));
-                UI::PushStyleColor(UI::Col::ButtonHovered, vec4(0.2f, 0.5f, 0.8f, 1.0f));
-                UI::PushStyleColor(UI::Col::ButtonActive, vec4(0.2f, 0.5f, 0.8f, 1.0f));
+                UI::PushStyleColor(UI::Col::Button, themeActiveTabColor);
+                UI::PushStyleColor(UI::Col::ButtonHovered, themeActiveTabColor);
+                UI::PushStyleColor(UI::Col::ButtonActive, themeActiveTabColor);
                 UI::Button("Lobby", vec2(80.0f, barHeight));
                 UI::PopStyleColor(3);
 
@@ -402,13 +405,9 @@ void MainMenu() {
             if (GameManager::currentState == GameState::Playing && !gameOver) {
                 vec2 buttonCursor = UI::GetCursorPos();
                 UI::SetCursorPos(vec2(buttonCursor.x, buttonCursor.y - 10.0f));
-                UI::PushStyleColor(UI::Col::Button, vec4(0.8f, 0.2f, 0.2f, 1.0f));
-                UI::PushStyleColor(UI::Col::ButtonHovered, vec4(1.0f, 0.3f, 0.3f, 1.0f));
-                UI::PushStyleColor(UI::Col::ButtonActive, vec4(0.6f, 0.1f, 0.1f, 1.0f));
                 if (UI::Button("Forfeit", vec2(moveHistoryWidth, belowBoardUIHeight))) {
                     Network::Resign();
                 }
-                UI::PopStyleColor(3);
             }
             UI::EndGroup();
 
