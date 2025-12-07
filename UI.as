@@ -99,13 +99,10 @@ void MainMenu() {
                     UI::NewLine();
                     UI::Text("\\$f80Rules:");
                     UI::TextWrapped("- Play follows standard chess rules");
-                    UI::TextWrapped("- Click a piece to select it, then click a valid square to move");
-                    UI::TextWrapped("- The game ends when checkmate is achieved or a player forfeits");
+                    UI::TextWrapped("To do");
                     UI::NewLine();
                     UI::Text("\\$0f0How to Play:");
-                    UI::TextWrapped("1. Click the 'Play' tab to find or create a game");
-                    UI::TextWrapped("2. Join a lobby or create your own");
-                    UI::TextWrapped("3. Wait for an opponent and start playing!");
+                    UI::TextWrapped("To do");
 
                 } else if (currentMenuTab == MenuTab::Play) {
                     // Play tab - Show lobby browser directly
@@ -342,24 +339,24 @@ void MainMenu() {
 
             UI::Separator();
 
-            // Game info
-            string turnText = (currentTurn == PieceColor::White) ? "\\$fffWhite" : "\\$666Black";
-            UI::Text("Turn: " + turnText);
-            UI::SameLine();
+            if (!gameOver) {
+                // Game info
+                string turnText = (currentTurn == PieceColor::White) ? "\\$fffWhite" : "\\$666Black";
+                UI::Text("Turn: " + turnText);
+                UI::SameLine();
 
-            if (!GameManager::isLocalPlayerTurn()) {
-                UI::SameLine();
-                UI::Text("\\$ff0Waiting for opponent's move...");
+                if (!GameManager::isLocalPlayerTurn()) {
+                    UI::SameLine();
+                    UI::Text("\\$ff0Waiting for opponent's move...");
+                } else {
+                    UI::SameLine();
+                    UI::Text("");
+                }
+                if (IsInCheck(PieceColor(currentTurn))) {
+                    UI::SameLine();
+                    UI::Text("\\$f00CHECK!");
+                }
             } else {
-                UI::SameLine();
-                UI::Text("");
-            }
-            if (IsInCheck(PieceColor(currentTurn))) {
-                UI::SameLine();
-                UI::Text("\\$f00CHECK!");
-            }
-            if (gameOver) {
-                UI::SameLine();
                 UI::Text("\\$ff0Game over!" + gameResult);
             }
 
@@ -389,7 +386,7 @@ void MainMenu() {
             bool flipBoard = (Network::gameId != "" && !Network::isWhite);
 
             UI::BeginGroup();
-            UI::BeginChild("MoveHistory", vec2(moveHistoryWidth, availableHeight), true);
+            UI::BeginChild("MoveHistory", vec2(moveHistoryWidth, availableHeight - 40.0f), true);
             UI::Text("Move History:");
             UI::Separator();
             for (uint i = 0; i < moveHistory.Length; i++) {
@@ -404,9 +401,44 @@ void MainMenu() {
             // Forfeit button below move history, aligned with it
             if (GameManager::currentState == GameState::Playing && !gameOver) {
                 vec2 buttonCursor = UI::GetCursorPos();
-                UI::SetCursorPos(vec2(buttonCursor.x, buttonCursor.y - 10.0f));
+                UI::SetCursorPos(vec2(buttonCursor.x, buttonCursor.y + 30.0f));
                 if (UI::Button("Forfeit", vec2(moveHistoryWidth, belowBoardUIHeight))) {
                     Network::Resign();
+                }
+            }
+            if (GameManager::currentState == GameState::GameOver) {
+                vec2 buttonCursor = UI::GetCursorPos();
+                UI::SetCursorPos(vec2(buttonCursor.x, buttonCursor.y - 5.0f));
+
+                // Show different UI based on rematch state
+                if (rematchRequestReceived) {
+                    // Opponent requested rematch - show accept/decline buttons
+                    UI::Text(themeSuccessTextColor + "Opponent wants a rematch!");
+                    if (UI::Button("Accept Rematch", vec2(moveHistoryWidth, belowBoardUIHeight))) {
+                        Network::RespondToRematch(true);
+                    }
+                    if (UI::Button("Decline", vec2(moveHistoryWidth, belowBoardUIHeight))) {
+                        Network::RespondToRematch(false);
+                    }
+                } else if (rematchRequestSent) {
+                    // Waiting for opponent to respond
+                    UI::Text(themeWarningTextColor + "Waiting for opponent...");
+                    if (UI::Button("Cancel Request", vec2(moveHistoryWidth, belowBoardUIHeight))) {
+                        rematchRequestSent = false;
+                        UI::ShowNotification("Chess", "Rematch request cancelled", vec4(0.8,0.8,0.2,1), 3000);
+                    }
+                } else {
+                    // Normal state - show rematch button
+                    if (UI::Button("Request Rematch", vec2(moveHistoryWidth, belowBoardUIHeight))) {
+                        Network::RequestNewGame();
+                    }
+                }
+
+                if (UI::Button("Back to menu", vec2(moveHistoryWidth, belowBoardUIHeight))) {
+                    Network::LeaveLobby();
+                    GameManager::currentState = GameState::Menu;
+                    rematchRequestReceived = false;
+                    rematchRequestSent = false;
                 }
             }
             UI::EndGroup();

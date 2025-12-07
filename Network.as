@@ -208,6 +208,21 @@ namespace Network {
         j["gameId"] = gameId;
         SendJson(j);
     }
+    // Respond to rematch request
+    void RespondToRematch(bool accept) {
+        print("[Chess] RespondToRematch called - accept: " + accept + ", gameId: " + (gameId.Length > 0 ? gameId : "EMPTY"));
+        if (gameId.Length == 0) {
+            print("[Chess] Cannot respond to rematch - gameId is empty");
+            return;
+        }
+        Json::Value j = Json::Object();
+        j["type"] = "rematch_response";
+        j["gameId"] = gameId;
+        j["accept"] = accept;
+        SendJson(j);
+        rematchRequestReceived = false;
+        print("[Chess] Sent rematch response: " + (accept ? "accepted" : "declined"));
+    }
     // Send race result
     void SendRaceResult(int timeMs) {
         if (gameId.Length == 0) return;
@@ -293,6 +308,8 @@ namespace Network {
             gameOver = false;
             gameResult = "";
             moveHistory.Resize(0); // Clear move history for new game
+            rematchRequestReceived = false;
+            rematchRequestSent = false;
 
             ApplyFEN(fen, turn);
             GameManager::currentState = GameState::Playing;
@@ -359,6 +376,21 @@ namespace Network {
             defenderTime = -1;
             captureFrom = "";
             captureTo = "";
+        } else if (t == "rematch_request") {
+            print("[Chess] Received rematch request from opponent");
+            rematchRequestReceived = true;
+            rematchRequestSent = false;
+            UI::ShowNotification("Chess", "Your opponent wants a rematch!", vec4(0.2,0.8,0.2,1), 5000);
+        } else if (t == "rematch_sent") {
+            print("[Chess] Rematch request sent to opponent");
+            rematchRequestSent = true;
+            rematchRequestReceived = false;
+            UI::ShowNotification("Chess", "Rematch request sent. Waiting for opponent...", vec4(0.8,0.8,0.2,1), 4000);
+        } else if (t == "rematch_declined") {
+            print("[Chess] Rematch declined");
+            rematchRequestReceived = false;
+            rematchRequestSent = false;
+            UI::ShowNotification("Chess", "Rematch declined", vec4(1,0.4,0.4,1), 4000);
         } else if (t == "error") {
             UI::ShowNotification("Chess", "Error: " + string(msg["code"]), vec4(1,0.4,0.4,1), 4000);
         }

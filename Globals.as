@@ -46,6 +46,10 @@ int selectedCol;
 int gSelR = -1;
 int gSelC = -1;
 
+// rematch variables
+bool rematchRequestReceived = false;
+bool rematchRequestSent = false;
+
 // server variables
 string ui_serverHost = "";
 string ui_serverPort = "";

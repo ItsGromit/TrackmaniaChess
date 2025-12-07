@@ -1,7 +1,7 @@
 // gameHandlers.js - Game-related message handlers
 
 const { Chess } = require('chess.js');
-const { games, lobbies, lastOpponents, raceChallenges } = require('./state');
+const { games, lobbies, lastOpponents, raceChallenges, rematchRequests } = require('./state');
 const { send, broadcastPlayers, toAlgebra } = require('./utils');
 const { fetchRandomShortMap } = require('./mapService');
 
@@ -149,82 +149,121 @@ function handleResign(socket, msg) {
   games.delete(msg.gameId);
 }
 
-// Handle new_game message
+// Handle new_game message (rematch request)
 function handleNewGame(socket, msg) {
   let game = games.get(msg.gameId);
-  let p1, p2;
+  let opponent;
 
   if (game) {
     // Active game exists - use those players
     const isPlayer = (socket === game.white || socket === game.black);
     if (!isPlayer) return;
-    p1 = game.white;
-    p2 = game.black;
-    // End the current game
-    games.delete(msg.gameId);
+    opponent = (socket === game.white) ? game.black : game.white;
   } else {
     // Game ended - use lastOpponents mapping
-    p1 = socket;
-    p2 = lastOpponents.get(socket);
-    if (!p2) return; // No opponent found for rematch
+    opponent = lastOpponents.get(socket);
+    if (!opponent) return; // No opponent found for rematch
   }
+
+  // Store the rematch request
+  rematchRequests.set(socket, { requester: socket, opponent: opponent, gameId: msg.gameId });
+
+  // Send rematch request to opponent
+  send(opponent, {
+    type: 'rematch_request',
+    gameId: msg.gameId
+  });
+
+  // Notify requester that request was sent
+  send(socket, {
+    type: 'rematch_sent',
+    gameId: msg.gameId
+  });
+
+  console.log(`[Chess] Rematch request sent from ${socket.id} to ${opponent.id}`);
+}
+
+// Handle rematch response
+function handleRematchResponse(socket, msg) {
+  const { gameId, accept } = msg;
+
+  // Find the rematch request where this socket is the opponent
+  let request = null;
+  for (const [requester, req] of rematchRequests) {
+    if (req.opponent === socket && req.gameId === gameId) {
+      request = req;
+      break;
+    }
+  }
+
+  if (!request) {
+    return send(socket, { type: 'error', code: 'NO_REMATCH_REQUEST' });
+  }
+
+  const requester = request.requester;
+  const opponent = request.opponent;
+
+  // Clear the request
+  rematchRequests.delete(requester);
+
+  if (!accept) {
+    // Opponent declined
+    send(requester, {
+      type: 'rematch_declined',
+      gameId: gameId
+    });
+    send(opponent, {
+      type: 'rematch_declined',
+      gameId: gameId
+    });
+    console.log(`[Chess] Rematch declined by ${socket.id}`);
+    return;
+  }
+
+  // Opponent accepted - start new game
+  console.log(`[Chess] Rematch accepted by ${socket.id}, starting new game`);
+
+  const p1 = requester;
+  const p2 = opponent;
 
   // Create new game with randomized teams
   const newGameId = Math.random().toString(36).slice(2, 9);
   const chess = new Chess();
 
-  let newWhite, newBlack;
-
-  if (p2) {
-    // Two players: randomly swap them
-    const randomize = Math.random() < 0.5;
-    newWhite = randomize ? p1 : p2;
-    newBlack = randomize ? p2 : p1;
-  } else {
-    // Single player: randomly assign them to white or black
-    const assignWhite = Math.random() < 0.5;
-    if (assignWhite) {
-      newWhite = p1;
-      newBlack = null;
-    } else {
-      newWhite = null;
-      newBlack = p1;
-    }
-  }
+  // Randomly swap players
+  const randomize = Math.random() < 0.5;
+  const newWhite = randomize ? p1 : p2;
+  const newBlack = randomize ? p2 : p1;
 
   const newGame = { white: newWhite, black: newBlack, chess, createdAt: Date.now() };
   games.set(newGameId, newGame);
 
   // Update lastOpponents for the new game
-  if (p1 && p2) {
-    lastOpponents.set(p1, p2);
-    lastOpponents.set(p2, p1);
-  }
+  lastOpponents.set(p1, p2);
+  lastOpponents.set(p2, p1);
 
-  if (newWhite) {
-    send(newWhite, {
-      type: 'game_start',
-      gameId: newGameId,
-      isWhite: true,
-      opponentId: newBlack ? newBlack.id : null,
-      fen: chess.fen(),
-      turn: 'w'
-    });
-  }
-  if (newBlack) {
-    send(newBlack, {
-      type: 'game_start',
-      gameId: newGameId,
-      isWhite: false,
-      opponentId: newWhite ? newWhite.id : null,
-      fen: chess.fen(),
-      turn: 'w'
-    });
-  }
+  send(newWhite, {
+    type: 'game_start',
+    gameId: newGameId,
+    isWhite: true,
+    opponentId: newBlack.id,
+    fen: chess.fen(),
+    turn: 'w'
+  });
+
+  send(newBlack, {
+    type: 'game_start',
+    gameId: newGameId,
+    isWhite: false,
+    opponentId: newWhite.id,
+    fen: chess.fen(),
+    turn: 'w'
+  });
 }
 
 module.exports = {
   handleMove,
   handleResign,
-  handleNewGame
+  handleNewGame,
+  handleRematchResponse
 };

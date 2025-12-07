@@ -33,6 +33,8 @@ async function onMessage(socket, msg) {
       return gameHandlers.handleResign(socket, msg);
     case 'new_game':
       return gameHandlers.handleNewGame(socket, msg);
+    case 'rematch_response':
+      return gameHandlers.handleRematchResponse(socket, msg);
 
     // Race challenges
     case 'race_result':

@@ -6,11 +6,13 @@ const lobbies = new Map();   // lobbyId -> { id, host:Socket, players:Socket[], 
 const clients = new Set();   // connected sockets
 const lastOpponents = new Map(); // socket -> opponent socket (for rematch after game ends)
 const raceChallenges = new Map(); // gameId -> { from, to, mapUid, mapName, defenderTime, defenderSocket, attackerSocket }
+const rematchRequests = new Map(); // socket -> { requester:Socket, opponent:Socket, gameId:string }
 
 module.exports = {
   games,
   lobbies,
   clients,
   lastOpponents,
-  raceChallenges
+  raceChallenges,
+  rematchRequests
 };
