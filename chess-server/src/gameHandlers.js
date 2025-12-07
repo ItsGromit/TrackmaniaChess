@@ -151,52 +151,79 @@ function handleResign(socket, msg) {
 
 // Handle new_game message (rematch request)
 function handleNewGame(socket, msg) {
+  console.log(`[Chess] handleNewGame called - socket: ${socket.id}, gameId: ${msg.gameId}`);
+
   let game = games.get(msg.gameId);
   let opponent;
 
   if (game) {
     // Active game exists - use those players
     const isPlayer = (socket === game.white || socket === game.black);
-    if (!isPlayer) return;
+    if (!isPlayer) {
+      console.log(`[Chess] Error: Socket ${socket.id} is not a player in game ${msg.gameId}`);
+      return;
+    }
     opponent = (socket === game.white) ? game.black : game.white;
+    console.log(`[Chess] Found active game - opponent: ${opponent.id}`);
   } else {
     // Game ended - use lastOpponents mapping
     opponent = lastOpponents.get(socket);
-    if (!opponent) return; // No opponent found for rematch
+    if (!opponent) {
+      console.log(`[Chess] Error: No opponent found for socket ${socket.id} in lastOpponents map`);
+      return; // No opponent found for rematch
+    }
+    console.log(`[Chess] Game ended - found opponent from lastOpponents: ${opponent.id}`);
+  }
+
+  // Check if this socket has already sent a rematch request for this game
+  const existingRequest = rematchRequests.get(socket);
+  if (existingRequest && existingRequest.gameId === msg.gameId) {
+    console.log(`[Chess] Socket ${socket.id} already sent a rematch request for game ${msg.gameId}`);
+    send(socket, {
+      type: 'error',
+      code: 'REMATCH_ALREADY_SENT',
+      message: 'You have already sent a rematch request for this game'
+    });
+    return;
   }
 
   // Store the rematch request
   rematchRequests.set(socket, { requester: socket, opponent: opponent, gameId: msg.gameId });
+  console.log(`[Chess] Stored rematch request in map - requester: ${socket.id}, opponent: ${opponent.id}, gameId: ${msg.gameId}`);
 
   // Send rematch request to opponent
   send(opponent, {
     type: 'rematch_request',
     gameId: msg.gameId
   });
+  console.log(`[Chess] Sent rematch_request message to opponent ${opponent.id}`);
 
   // Notify requester that request was sent
   send(socket, {
     type: 'rematch_sent',
     gameId: msg.gameId
   });
-
-  console.log(`[Chess] Rematch request sent from ${socket.id} to ${opponent.id}`);
+  console.log(`[Chess] Sent rematch_sent confirmation to requester ${socket.id}`);
+  console.log(`[Chess] Rematch request completed successfully - ${socket.id} -> ${opponent.id} for game ${msg.gameId}`);
 }
 
 // Handle rematch response
 function handleRematchResponse(socket, msg) {
   const { gameId, accept } = msg;
+  console.log(`[Chess] handleRematchResponse called - socket: ${socket.id}, gameId: ${gameId}, accept: ${accept}`);
 
   // Find the rematch request where this socket is the opponent
   let request = null;
   for (const [requester, req] of rematchRequests) {
     if (req.opponent === socket && req.gameId === gameId) {
       request = req;
+      console.log(`[Chess] Found matching rematch request from ${requester.id}`);
       break;
     }
   }
 
   if (!request) {
+    console.log(`[Chess] Error: No rematch request found for socket ${socket.id} and game ${gameId}`);
     return send(socket, { type: 'error', code: 'NO_REMATCH_REQUEST' });
   }
 
@@ -205,9 +232,11 @@ function handleRematchResponse(socket, msg) {
 
   // Clear the request
   rematchRequests.delete(requester);
+  console.log(`[Chess] Cleared rematch request from map for requester ${requester.id}`);
 
   if (!accept) {
     // Opponent declined
+    console.log(`[Chess] Rematch declined by ${socket.id} - notifying both players`);
     send(requester, {
       type: 'rematch_declined',
       gameId: gameId
@@ -216,31 +245,36 @@ function handleRematchResponse(socket, msg) {
       type: 'rematch_declined',
       gameId: gameId
     });
-    console.log(`[Chess] Rematch declined by ${socket.id}`);
+    console.log(`[Chess] Rematch declined messages sent to ${requester.id} and ${opponent.id}`);
     return;
   }
 
   // Opponent accepted - start new game
-  console.log(`[Chess] Rematch accepted by ${socket.id}, starting new game`);
+  console.log(`[Chess] Rematch accepted by ${socket.id} (${opponent.id}) - starting new game with ${requester.id}`);
 
   const p1 = requester;
   const p2 = opponent;
 
   // Create new game with randomized teams
   const newGameId = Math.random().toString(36).slice(2, 9);
+  console.log(`[Chess] Generated new game ID: ${newGameId}`);
+
   const chess = new Chess();
 
   // Randomly swap players
   const randomize = Math.random() < 0.5;
   const newWhite = randomize ? p1 : p2;
   const newBlack = randomize ? p2 : p1;
+  console.log(`[Chess] Randomized colors (${randomize ? 'swapped' : 'not swapped'}) - White: ${newWhite.id}, Black: ${newBlack.id}`);
 
   const newGame = { white: newWhite, black: newBlack, chess, createdAt: Date.now() };
   games.set(newGameId, newGame);
+  console.log(`[Chess] Created and stored new game ${newGameId}`);
 
   // Update lastOpponents for the new game
   lastOpponents.set(p1, p2);
   lastOpponents.set(p2, p1);
+  console.log(`[Chess] Updated lastOpponents map for both players`);
 
   send(newWhite, {
     type: 'game_start',
@@ -250,6 +284,7 @@ function handleRematchResponse(socket, msg) {
     fen: chess.fen(),
     turn: 'w'
   });
+  console.log(`[Chess] Sent game_start to white player ${newWhite.id}`);
 
   send(newBlack, {
     type: 'game_start',
@@ -259,6 +294,8 @@ function handleRematchResponse(socket, msg) {
     fen: chess.fen(),
     turn: 'w'
   });
+  console.log(`[Chess] Sent game_start to black player ${newBlack.id}`);
+  console.log(`[Chess] Rematch game creation completed successfully - Game ID: ${newGameId}`);
 }
 
 module.exports = {

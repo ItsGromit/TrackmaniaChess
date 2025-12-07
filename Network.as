@@ -392,7 +392,12 @@ namespace Network {
             rematchRequestSent = false;
             UI::ShowNotification("Chess", "Rematch declined", vec4(1,0.4,0.4,1), 4000);
         } else if (t == "error") {
-            UI::ShowNotification("Chess", "Error: " + string(msg["code"]), vec4(1,0.4,0.4,1), 4000);
+            string errorCode = string(msg["code"]);
+            if (errorCode == "REMATCH_ALREADY_SENT") {
+                UI::ShowNotification("Chess", "You have already sent a rematch request", vec4(1,0.4,0.4,1), 4000);
+            } else {
+                UI::ShowNotification("Chess", "Error: " + errorCode, vec4(1,0.4,0.4,1), 4000);
+            }
         }
     }
 
