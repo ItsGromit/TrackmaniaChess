@@ -1,7 +1,7 @@
 // gameHandlers.js - Game-related message handlers
 
 const { Chess } = require('chess.js');
-const { games, lobbies, lastOpponents, raceChallenges, rematchRequests } = require('./state');
+const { games, lobbies, lastOpponents, raceChallenges, rematchRequests, rerollRequests } = require('./state');
 const { send, broadcastPlayers, toAlgebra } = require('./utils');
 const { fetchRandomShortMap } = require('./mapService');
 
@@ -298,9 +298,134 @@ function handleRematchResponse(socket, msg) {
   console.log(`[Chess] Rematch game creation completed successfully - Game ID: ${newGameId}`);
 }
 
+// Handle re-roll request
+async function handleRerollRequest(socket, msg) {
+  const { gameId } = msg;
+  console.log(`[Chess] handleRerollRequest called - socket: ${socket.id}, gameId: ${gameId}`);
+
+  // Find the race challenge for this game
+  const challenge = raceChallenges.get(gameId);
+  if (!challenge) {
+    console.log(`[Chess] Error: No race challenge found for game ${gameId}`);
+    return send(socket, { type: 'error', code: 'NO_RACE_CHALLENGE' });
+  }
+
+  // Check if this socket is part of the race challenge
+  const isPlayer = (socket === challenge.attacker || socket === challenge.defender);
+  if (!isPlayer) {
+    console.log(`[Chess] Error: Socket ${socket.id} is not a player in race challenge for game ${gameId}`);
+    return send(socket, { type: 'error', code: 'NOT_IN_RACE' });
+  }
+
+  const opponent = (socket === challenge.attacker) ? challenge.defender : challenge.attacker;
+  console.log(`[Chess] Found opponent for re-roll: ${opponent.id}`);
+
+  // Check if this socket has already sent a re-roll request for this game
+  const existingRequest = rerollRequests.get(socket);
+  if (existingRequest && existingRequest.gameId === gameId) {
+    console.log(`[Chess] Socket ${socket.id} already sent a re-roll request for game ${gameId}`);
+    return send(socket, { type: 'error', code: 'REROLL_ALREADY_SENT' });
+  }
+
+  // Store the re-roll request
+  rerollRequests.set(socket, { requester: socket, opponent: opponent, gameId: gameId });
+  console.log(`[Chess] Stored re-roll request in map - requester: ${socket.id}, opponent: ${opponent.id}, gameId: ${gameId}`);
+
+  // Send re-roll request to opponent
+  send(opponent, {
+    type: 'reroll_request',
+    gameId: gameId
+  });
+  console.log(`[Chess] Sent reroll_request message to opponent ${opponent.id}`);
+
+  // Notify requester that request was sent
+  send(socket, {
+    type: 'reroll_sent',
+    gameId: gameId
+  });
+  console.log(`[Chess] Sent reroll_sent confirmation to requester ${socket.id}`);
+}
+
+// Handle re-roll response
+async function handleRerollResponse(socket, msg) {
+  const { gameId, accept } = msg;
+  console.log(`[Chess] handleRerollResponse called - socket: ${socket.id}, gameId: ${gameId}, accept: ${accept}`);
+
+  // Find the re-roll request where this socket is the opponent
+  let request = null;
+  for (const [requester, req] of rerollRequests) {
+    if (req.opponent === socket && req.gameId === gameId) {
+      request = req;
+      console.log(`[Chess] Found matching re-roll request from ${requester.id}`);
+      break;
+    }
+  }
+
+  if (!request) {
+    console.log(`[Chess] Error: No re-roll request found for socket ${socket.id} and game ${gameId}`);
+    return send(socket, { type: 'error', code: 'NO_REROLL_REQUEST' });
+  }
+
+  const requester = request.requester;
+  const opponent = request.opponent;
+
+  // Clear the request
+  rerollRequests.delete(requester);
+  console.log(`[Chess] Cleared re-roll request from map for requester ${requester.id}`);
+
+  if (!accept) {
+    // Opponent declined
+    console.log(`[Chess] Re-roll declined by ${socket.id} - notifying both players`);
+    send(requester, {
+      type: 'reroll_declined',
+      gameId: gameId
+    });
+    send(opponent, {
+      type: 'reroll_declined',
+      gameId: gameId
+    });
+    console.log(`[Chess] Re-roll declined messages sent to ${requester.id} and ${opponent.id}`);
+    return;
+  }
+
+  // Opponent accepted - get a new random map
+  console.log(`[Chess] Re-roll accepted by ${socket.id} - fetching new map`);
+
+  const game = games.get(gameId);
+  const map = await fetchRandomShortMap(game ? game.mapFilters || {} : {});
+  console.log(`[Chess] Fetched new map: ${map.name} (UID: ${map.uid})`);
+
+  // Update the race challenge with the new map
+  const challenge = raceChallenges.get(gameId);
+  if (challenge) {
+    challenge.mapUid = map.uid;
+    challenge.mapName = map.name;
+    console.log(`[Chess] Updated race challenge with new map`);
+  }
+
+  // Notify both players about the new map
+  send(requester, {
+    type: 'reroll_approved',
+    gameId: gameId,
+    mapUid: map.uid,
+    mapName: map.name
+  });
+
+  send(opponent, {
+    type: 'reroll_approved',
+    gameId: gameId,
+    mapUid: map.uid,
+    mapName: map.name
+  });
+
+  console.log(`[Chess] Re-roll approved messages sent to both players with new map`);
+}
+
 module.exports = {
   handleMove,
   handleResign,
   handleNewGame,
-  handleRematchResponse
+  handleRematchResponse,
+  handleRerollRequest,
+  handleRerollResponse
 };

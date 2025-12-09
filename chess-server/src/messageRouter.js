@@ -37,6 +37,10 @@ async function onMessage(socket, msg) {
       return gameHandlers.handleRematchResponse(socket, msg);
 
     // Race challenges
+    case 'reroll_request':
+      return await gameHandlers.handleRerollRequest(socket, msg);
+    case 'reroll_response':
+      return await gameHandlers.handleRerollResponse(socket, msg);
     case 'race_result':
       return raceHandlers.handleRaceResult(socket, msg);
     case 'race_retire':

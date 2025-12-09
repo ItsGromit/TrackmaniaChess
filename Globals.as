@@ -50,9 +50,17 @@ int gSelC = -1;
 bool rematchRequestReceived = false;
 bool rematchRequestSent = false;
 
+// re-roll variables
+bool rerollRequestReceived = false;
+bool rerollRequestSent = false;
+
 // server variables
 string ui_serverHost = "";
 string ui_serverPort = "";
+
+// Developer mode
+[Setting category="Developer" name="Enable Developer Mode"]
+bool developerMode = false;
 
 // race variables
 uint64 raceStartedAt = 0;

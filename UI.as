@@ -162,6 +162,36 @@ void MainMenu() {
                     if (UI::Button(settingsButtonText, vec2(150.0f, 0))) {
                         windowResizeable = !windowResizeable;
                     }
+
+                    UI::NewLine();
+                    UI::Separator();
+                    UI::NewLine();
+
+                    // Developer Mode Section
+                    UI::Text(themeSectionLabelColor + "Developer Settings:");
+                    UI::NewLine();
+
+                    developerMode = UI::Checkbox("Enable Developer Mode", developerMode);
+                    if (UI::IsItemHovered()) {
+                        UI::BeginTooltip();
+                        UI::Text("Enables testing features without needing another player");
+                        UI::EndTooltip();
+                    }
+
+                    if (developerMode) {
+                        UI::NewLine();
+                        UI::Text(themeWarningTextColor + "Developer Mode Active");
+                        UI::NewLine();
+
+                        if (UI::Button("Test Race Challenge", vec2(200.0f, 0))) {
+                            Network::TestRaceChallenge();
+                        }
+                        if (UI::IsItemHovered()) {
+                            UI::BeginTooltip();
+                            UI::Text("Simulate a race challenge with a random Winter 2025 map");
+                            UI::EndTooltip();
+                        }
+                    }
                 }
 
                 break;
@@ -297,6 +327,33 @@ void MainMenu() {
                 break;
             }
             case GameState::Playing: {
+                break;
+            }
+
+            case GameState::RaceChallenge: {
+                UI::Text(themeSectionLabelColor + "Race Challenge!");
+                UI::NewLine();
+                UI::Text("Map: " + Network::raceMapName);
+                UI::Text("You are the: " + (Network::isDefender ? themeWarningTextColor + "Defender" : themeSuccessTextColor + "Attacker"));
+                UI::NewLine();
+
+                // Show re-roll UI based on state
+                if (rerollRequestReceived) {
+                    UI::Text(themeSuccessTextColor + "Opponent wants to re-roll the map!");
+                    if (UI::Button("Accept Re-roll", vec2(200.0f, 0))) {
+                        Network::RespondToReroll(true);
+                    }
+                    UI::SameLine();
+                    if (UI::Button("Decline", vec2(200.0f, 0))) {
+                        Network::RespondToReroll(false);
+                    }
+                } else if (rerollRequestSent) {
+                    UI::Text(themeWarningTextColor + "Waiting for opponent to accept re-roll...");
+                } else {
+                    if (UI::Button("Request Re-roll", vec2(200.0f, 0))) {
+                        Network::RequestReroll();
+                    }
+                }
                 break;
             }
 

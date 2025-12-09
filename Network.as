@@ -223,6 +223,34 @@ namespace Network {
         rematchRequestReceived = false;
         print("[Chess] Sent rematch response: " + (accept ? "accepted" : "declined"));
     }
+    // Request re-roll
+    void RequestReroll() {
+        print("[Chess] RequestReroll called - gameId: " + (gameId.Length > 0 ? gameId : "EMPTY"));
+        if (gameId.Length == 0) {
+            print("[Chess] Cannot request re-roll - gameId is empty");
+            return;
+        }
+        print("[Chess] Sending reroll_request to server with gameId: " + gameId);
+        Json::Value j = Json::Object();
+        j["type"] = "reroll_request";
+        j["gameId"] = gameId;
+        SendJson(j);
+    }
+    // Respond to re-roll request
+    void RespondToReroll(bool accept) {
+        print("[Chess] RespondToReroll called - accept: " + accept + ", gameId: " + (gameId.Length > 0 ? gameId : "EMPTY"));
+        if (gameId.Length == 0) {
+            print("[Chess] Cannot respond to re-roll - gameId is empty");
+            return;
+        }
+        Json::Value j = Json::Object();
+        j["type"] = "reroll_response";
+        j["gameId"] = gameId;
+        j["accept"] = accept;
+        SendJson(j);
+        rerollRequestReceived = false;
+        print("[Chess] Sent re-roll response: " + (accept ? "accepted" : "declined"));
+    }
     // Send race result
     void SendRaceResult(int timeMs) {
         if (gameId.Length == 0) return;
@@ -353,6 +381,9 @@ namespace Network {
 
             // Reset race state in main.as via external variable
             raceStartedAt = Time::Now;
+
+            // Load the race map for both players
+            LoadRaceMap(raceMapUid);
         } else if (t == "race_defender_finished") {
             // Defender finished their race
             defenderTime = int(msg["time"]);
@@ -391,6 +422,34 @@ namespace Network {
             rematchRequestReceived = false;
             rematchRequestSent = false;
             UI::ShowNotification("Chess", "Rematch declined", vec4(1,0.4,0.4,1), 4000);
+        } else if (t == "reroll_request") {
+            print("[Chess] Received re-roll request from opponent");
+            rerollRequestReceived = true;
+            rerollRequestSent = false;
+            UI::ShowNotification("Chess", "Your opponent wants to re-roll the map!", vec4(0.2,0.8,0.2,1), 5000);
+        } else if (t == "reroll_sent") {
+            print("[Chess] Re-roll request sent to opponent");
+            rerollRequestSent = true;
+            rerollRequestReceived = false;
+            UI::ShowNotification("Chess", "Re-roll request sent. Waiting for opponent...", vec4(0.8,0.8,0.2,1), 4000);
+        } else if (t == "reroll_declined") {
+            print("[Chess] Re-roll declined");
+            rerollRequestReceived = false;
+            rerollRequestSent = false;
+            UI::ShowNotification("Chess", "Re-roll declined", vec4(1,0.4,0.4,1), 4000);
+        } else if (t == "reroll_approved") {
+            print("[Chess] Re-roll approved - loading new map");
+            rerollRequestReceived = false;
+            rerollRequestSent = false;
+
+            // Update map info and load new map
+            raceMapUid = string(msg["mapUid"]);
+            raceMapName = msg.HasKey("mapName") ? string(msg["mapName"]) : "Unknown Map";
+
+            print("[Chess] New map: " + raceMapName + " (UID: " + raceMapUid + ")");
+            UI::ShowNotification("Chess", "Loading new map: " + raceMapName, vec4(0.2,0.8,0.2,1), 5000);
+
+            LoadRaceMap(raceMapUid);
         } else if (t == "error") {
             string errorCode = string(msg["code"]);
             if (errorCode == "REMATCH_ALREADY_SENT") {
@@ -429,5 +488,251 @@ namespace Network {
         row = 8 - rank;
 
         return true;
+    }
+
+    // Developer/Testing function to simulate a race challenge
+    void TestRaceChallenge() {
+        print("[Chess] Developer: Simulating race challenge");
+
+        // Use a Winter 2025 campaign map for testing
+        array<string> testMapUids = {
+            "J3RyKSumRDcpqxza1y8PzvRitLl", // Winter 2025 - 01
+            "OzeeWxmRNIeCiHEPQHiHaffNjEj", // Winter 2025 - 02
+            "shPSqDL3bQ6nU6QmpHxJ_dVsI6k", // Winter 2025 - 03
+            "YPRoZqXOe_fTPJpNKNFOd1IlRel", // Winter 2025 - 04
+            "J0PHqGv4XovUkVOt5gTzzZQAk7d"  // Winter 2025 - 05
+        };
+
+        array<string> testMapNames = {
+            "Winter 2025 - 01",
+            "Winter 2025 - 02",
+            "Winter 2025 - 03",
+            "Winter 2025 - 04",
+            "Winter 2025 - 05"
+        };
+
+        // Pick a random test map
+        int randomIndex = Math::Rand(0, testMapUids.Length);
+        string testMapUid = testMapUids[randomIndex];
+        string testMapName = testMapNames[randomIndex];
+
+        // Simulate receiving a race_challenge message
+        raceMapUid = testMapUid;
+        raceMapName = testMapName;
+        isDefender = (Math::Rand(0, 2) == 0); // Random attacker/defender
+        captureFrom = "e2";
+        captureTo = "e4";
+        defenderTime = -1;
+
+        print("[Chess] Test Race - Map: " + raceMapName + ", You are: " + (isDefender ? "Defender" : "Attacker"));
+        GameManager::currentState = GameState::RaceChallenge;
+        raceStartedAt = Time::Now;
+
+        // Load the map
+        LoadRaceMap(raceMapUid);
+    }
+
+    // Load a race map by UID
+    void LoadRaceMap(const string &in mapUid) {
+        if (mapUid.Length == 0) {
+            print("[Chess] Cannot load map - empty UID");
+            return;
+        }
+
+        print("[Chess] Loading race map with UID: " + mapUid);
+
+        // Try to load the map directly by UID
+        // The PlayMap API might accept the UID directly, or we need to construct a proper URL
+        // For now, we'll try the UID directly as many Openplanet plugins do
+
+        print("[Chess] Attempting to load map by UID: " + mapUid);
+
+        // Store the UID in a temporary variable for the coroutine
+        tempMapUrl = mapUid;
+
+        // Load the map using TrackMania's PlayMap function
+        // The game mode for time attack is "TrackMania/TM_PlayMap_Local"
+        startnew(LoadMapNow);
+    }
+
+    // Temporary variable to pass data to coroutine
+    string tempMapUrl = "";
+
+    // Coroutine to load the map
+    void LoadMapNow() {
+        string mapUid = tempMapUrl;
+        tempMapUrl = "";
+
+        print("[Chess] Starting map load coroutine with UID: " + mapUid);
+
+        auto app = cast<CTrackMania>(GetApp());
+        if (app is null) {
+            print("[Chess] Error: Could not get app instance for loading");
+            return;
+        }
+
+        // Check if we're already in a map
+        auto playground = cast<CSmArenaClient>(app.CurrentPlayground);
+        if (playground !is null) {
+            print("[Chess] Currently in a map, returning to menu first");
+            app.BackToMainMenu();
+
+            // Wait for menu transition
+            for (int i = 0; i < 100; i++) {
+                yield();
+                auto check = cast<CSmArenaClient>(app.CurrentPlayground);
+                if (check is null) {
+                    print("[Chess] Successfully returned to menu");
+                    break;
+                }
+            }
+            sleep(1000);
+        }
+
+        // Try to find the map in the local file system or campaign
+        print("[Chess] Searching for map with UID: " + mapUid);
+        auto menuManager = app.MenuManager;
+        if (menuManager is null) {
+            print("[Chess] ERROR: MenuManager is null");
+            return;
+        }
+
+        CGameCtnChallengeInfo@ mapInfo = null;
+        auto campaignInfos = menuManager.ChallengeInfosCampaign;
+
+        // Search for the map in campaigns
+        if (campaignInfos.Length > 0) {
+            print("[Chess] Searching through " + campaignInfos.Length + " campaign maps");
+            for (uint i = 0; i < campaignInfos.Length; i++) {
+                auto info = campaignInfos[i];
+                if (info.MapUid == mapUid) {
+                    @mapInfo = info;
+                    print("[Chess] Found map: " + info.Name);
+                    break;
+                }
+            }
+        }
+
+        // If map not found locally, download it from TrackmaniaExchange
+        if (mapInfo is null) {
+            print("[Chess] Map not found locally, searching TrackmaniaExchange...");
+
+            // First, search TMX for the map by UID
+            string searchUrl = "https://trackmania.exchange/mapsearch2/search?api=on&trackuid=" + mapUid;
+            print("[Chess] Searching TMX: " + searchUrl);
+
+            auto searchReq = Net::HttpRequest();
+            searchReq.Url = searchUrl;
+            searchReq.Method = Net::HttpMethod::Get;
+            searchReq.Headers['User-Agent'] = "TrackmaniaChess/1.0 (Openplanet)";
+            searchReq.Start();
+
+            // Wait for search to complete
+            while (!searchReq.Finished()) {
+                yield();
+            }
+
+            if (searchReq.ResponseCode() != 200) {
+                print("[Chess] ERROR: TMX search failed. HTTP code: " + searchReq.ResponseCode());
+                print("[Chess] Cannot download map without TMX ID");
+                return;
+            }
+
+            // Parse the search results
+            auto searchResult = Json::Parse(searchReq.String());
+            if (searchResult.GetType() != Json::Type::Object || !searchResult.HasKey("results")) {
+                print("[Chess] ERROR: Invalid TMX search response");
+                return;
+            }
+
+            auto results = searchResult["results"];
+            if (results.Length == 0) {
+                print("[Chess] ERROR: Map not found on TrackmaniaExchange");
+                print("[Chess] The map might be a campaign/official map or not uploaded to TMX");
+                return;
+            }
+
+            // Get the first result (should be exact match by UID)
+            auto mapData = results[0];
+            int tmxId = int(mapData["TrackID"]);
+            string mapName = string(mapData["GbxMapName"]);
+            print("[Chess] Found map on TMX: " + mapName + " (ID: " + tmxId + ")");
+
+            // Download the map from TMX
+            string downloadUrl = "https://trackmania.exchange/maps/download/" + tmxId;
+            print("[Chess] Downloading from: " + downloadUrl);
+
+            auto downloadReq = Net::HttpRequest();
+            downloadReq.Url = downloadUrl;
+            downloadReq.Method = Net::HttpMethod::Get;
+            downloadReq.Headers['User-Agent'] = "TrackmaniaChess/1.0 (Openplanet)";
+            downloadReq.Start();
+
+            // Wait for download to complete
+            while (!downloadReq.Finished()) {
+                yield();
+            }
+
+            if (downloadReq.ResponseCode() == 200) {
+                string mapFileData = downloadReq.String();
+                print("[Chess] Map downloaded successfully (" + mapFileData.Length + " bytes)");
+
+                // Save the map to a temporary location
+                string tempMapPath = IO::FromUserGameFolder("Maps/Downloaded/" + mapUid + ".Map.Gbx");
+
+                // Create directory if it doesn't exist
+                string dir = IO::FromUserGameFolder("Maps/Downloaded/");
+                if (!IO::FolderExists(dir)) {
+                    IO::CreateFolder(dir);
+                    print("[Chess] Created download directory: " + dir);
+                }
+
+                // Write the map file
+                IO::File file;
+                file.Open(tempMapPath, IO::FileMode::Write);
+                file.Write(mapFileData);
+                file.Close();
+
+                print("[Chess] Map saved to: " + tempMapPath);
+
+                // Now try to load the downloaded map
+                auto maniaTitleAPI = app.ManiaTitleControlScriptAPI;
+                if (maniaTitleAPI !is null) {
+                    print("[Chess] Loading downloaded map...");
+                    maniaTitleAPI.PlayMap(tempMapPath, "TrackMania/TM_PlayMap_Local", "");
+
+                    sleep(3000);
+                    auto result = cast<CSmArenaClient>(app.CurrentPlayground);
+                    if (result !is null) {
+                        print("[Chess] SUCCESS: Downloaded map loaded!");
+                    } else {
+                        print("[Chess] Map loading - please wait...");
+                    }
+                }
+            } else {
+                print("[Chess] ERROR: Failed to download map from TMX. HTTP code: " + downloadReq.ResponseCode());
+                print("[Chess] The download might have been blocked or the map is unavailable");
+            }
+            return;
+        }
+
+        // If we found the map locally, load it directly
+        print("[Chess] Loading map from local files: " + mapInfo.FileName);
+        app.BackToMainMenu();
+        yield();
+
+        auto maniaTitleAPI = app.ManiaTitleControlScriptAPI;
+        if (maniaTitleAPI !is null) {
+            maniaTitleAPI.PlayMap(mapInfo.FileName, "TrackMania/TM_PlayMap_Local", "");
+
+            // Wait and verify
+            sleep(3000);
+            auto result = cast<CSmArenaClient>(app.CurrentPlayground);
+            if (result !is null) {
+                print("[Chess] SUCCESS: Map loaded!");
+            } else {
+                print("[Chess] Map loading - please wait...");
+            }
+        }
     }
 }
