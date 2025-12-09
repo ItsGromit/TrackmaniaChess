@@ -331,29 +331,7 @@ void MainMenu() {
             }
 
             case GameState::RaceChallenge: {
-                UI::Text(themeSectionLabelColor + "Race Challenge!");
-                UI::NewLine();
-                UI::Text("Map: " + Network::raceMapName);
-                UI::Text("You are the: " + (Network::isDefender ? themeWarningTextColor + "Defender" : themeSuccessTextColor + "Attacker"));
-                UI::NewLine();
-
-                // Show re-roll UI based on state
-                if (rerollRequestReceived) {
-                    UI::Text(themeSuccessTextColor + "Opponent wants to re-roll the map!");
-                    if (UI::Button("Accept Re-roll", vec2(200.0f, 0))) {
-                        Network::RespondToReroll(true);
-                    }
-                    UI::SameLine();
-                    if (UI::Button("Decline", vec2(200.0f, 0))) {
-                        Network::RespondToReroll(false);
-                    }
-                } else if (rerollRequestSent) {
-                    UI::Text(themeWarningTextColor + "Waiting for opponent to accept re-roll...");
-                } else {
-                    if (UI::Button("Request Re-roll", vec2(200.0f, 0))) {
-                        Network::RequestReroll();
-                    }
-                }
+                // Race challenge UI is now in a separate window (see Main.as RenderRaceWindow)
                 break;
             }
 

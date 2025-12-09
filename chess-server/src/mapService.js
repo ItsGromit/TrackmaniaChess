@@ -7,10 +7,13 @@ const { BLACKLISTED_AUTHORS, BLACKLISTED_MAPPACKS } = require('./config');
 async function fetchRandomShortMap(filters = {}) {
   return new Promise((resolve) => {
     // Build query parameters based on filters
+    // Use a random page offset to get different maps each time
+    const randomPage = Math.floor(Math.random() * 50); // Random page from 0-49
     const params = new URLSearchParams({
       api: 'on',
-      random: '1',
-      limit: '1'
+      limit: '100', // Fetch 100 maps to choose from
+      mtype: 'TM_Race', // Only race maps
+      page: randomPage.toString() // Random page for variety
     });
 
     // Apply filters (defaults if not specified)
@@ -87,14 +90,16 @@ async function fetchRandomShortMap(filters = {}) {
         try {
           const response = JSON.parse(data);
 
-          // Check if we got a map (TMX mapsearch2 returns {results: [...]} )
+          // Check if we got maps (TMX mapsearch2 returns {results: [...]} )
           if (response && response.results && Array.isArray(response.results) && response.results.length > 0) {
-            const map = response.results[0];
+            // Pick a random map from the results for better randomization
+            const randomIndex = Math.floor(Math.random() * response.results.length);
+            const map = response.results[randomIndex];
             const mapInfo = {
               uid: map.TrackUID,
               name: map.GbxMapName || map.Name || 'Unknown Map'
             };
-            console.log(`[Chess] Selected random map from TMX: ${mapInfo.name} (${mapInfo.uid})`);
+            console.log(`[Chess] Selected random map from TMX (${randomIndex + 1}/${response.results.length}): ${mapInfo.name} (${mapInfo.uid})`);
             resolve(mapInfo);
           } else {
             // Fallback to Winter 2025 campaign maps if API fails
