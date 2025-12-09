@@ -17,6 +17,12 @@ void Render() {
     if (!showWindow) return;
     EnsurePieceAssetsLoaded();
 
+    // Hide main window during race challenge
+    if (GameManager::currentState == GameState::RaceChallenge) {
+        RenderRaceWindow();
+        return;
+    }
+
     UI::SetNextWindowSize(int(defaultWidth), int(defaultHeight), UI::Cond::Appearing);
 
     int windowFlags = windowResizeable ? 0 : UI::WindowFlags::NoResize;
@@ -25,11 +31,6 @@ void Render() {
     vec2 mainWindowSize;
 
     MainMenu();
-
-    // Render separate race challenge window when in race
-    if (GameManager::currentState == GameState::RaceChallenge) {
-        RenderRaceWindow();
-    }
 }
 
 void RenderRaceWindow() {
@@ -43,20 +44,28 @@ void RenderRaceWindow() {
     UI::NewLine();
 
     // Show re-roll UI based on state
-    if (rerollRequestReceived) {
-        UI::Text(themeSuccessTextColor + "Opponent wants to re-roll the map!");
-        if (UI::Button("Accept Re-roll", vec2(180.0f, 0))) {
-            Network::RespondToReroll(true);
+    if (developerMode) {
+        // In developer mode, just re-roll immediately without requesting
+        if (UI::Button("Re-roll Map", vec2(200.0f, 0))) {
+            Network::TestRerollMap();
         }
-        UI::SameLine();
-        if (UI::Button("Decline", vec2(180.0f, 0))) {
-            Network::RespondToReroll(false);
-        }
-    } else if (rerollRequestSent) {
-        UI::Text(themeWarningTextColor + "Waiting for opponent to accept re-roll...");
     } else {
-        if (UI::Button("Request Re-roll", vec2(200.0f, 0))) {
-            Network::RequestReroll();
+        // Normal multiplayer mode with request/response
+        if (rerollRequestReceived) {
+            UI::Text(themeSuccessTextColor + "Opponent wants to re-roll the map!");
+            if (UI::Button("Accept Re-roll", vec2(180.0f, 0))) {
+                Network::RespondToReroll(true);
+            }
+            UI::SameLine();
+            if (UI::Button("Decline", vec2(180.0f, 0))) {
+                Network::RespondToReroll(false);
+            }
+        } else if (rerollRequestSent) {
+            UI::Text(themeWarningTextColor + "Waiting for opponent to accept re-roll...");
+        } else {
+            if (UI::Button("Request Re-roll", vec2(200.0f, 0))) {
+                Network::RequestReroll();
+            }
         }
     }
 

@@ -526,9 +526,47 @@ namespace Network {
 
         print("[Chess] Test Race - Map: " + raceMapName + ", You are: " + (isDefender ? "Defender" : "Attacker"));
         GameManager::currentState = GameState::RaceChallenge;
+
         raceStartedAt = Time::Now;
 
         // Load the map
+        LoadRaceMap(raceMapUid);
+    }
+
+    // Developer/Testing function to re-roll to a new map (no opponent approval needed)
+    void TestRerollMap() {
+        print("[Chess] Developer: Re-rolling to new map");
+
+        // Use a Winter 2025 campaign map for testing
+        array<string> testMapUids = {
+            "J3RyKSumRDcpqxza1y8PzvRitLl", // Winter 2025 - 01
+            "OzeeWxmRNIeCiHEPQHiHaffNjEj", // Winter 2025 - 02
+            "shPSqDL3bQ6nU6QmpHxJ_dVsI6k", // Winter 2025 - 03
+            "YPRoZqXOe_fTPJpNKNFOd1IlRel", // Winter 2025 - 04
+            "J0PHqGv4XovUkVOt5gTzzZQAk7d"  // Winter 2025 - 05
+        };
+
+        array<string> testMapNames = {
+            "Winter 2025 - 01",
+            "Winter 2025 - 02",
+            "Winter 2025 - 03",
+            "Winter 2025 - 04",
+            "Winter 2025 - 05"
+        };
+
+        // Pick a random test map
+        int randomIndex = Math::Rand(0, testMapUids.Length);
+        string testMapUid = testMapUids[randomIndex];
+        string testMapName = testMapNames[randomIndex];
+
+        // Update the race challenge with new map
+        raceMapUid = testMapUid;
+        raceMapName = testMapName;
+
+        print("[Chess] Re-rolled to new map: " + raceMapName + " (UID: " + raceMapUid + ")");
+        UI::ShowNotification("Chess", "Loading new map: " + raceMapName, vec4(0.2,0.8,0.2,1), 5000);
+
+        // Load the new map
         LoadRaceMap(raceMapUid);
     }
 

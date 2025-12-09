@@ -8,13 +8,24 @@ async function fetchRandomShortMap(filters = {}) {
   return new Promise((resolve) => {
     // Build query parameters based on filters
     // Use a random page offset to get different maps each time
-    const randomPage = Math.floor(Math.random() * 50); // Random page from 0-49
+    // Increased range to 0-199 for more variety (20,000 potential maps with limit=100)
+    const randomPage = Math.floor(Math.random() * 200);
+
+    // Randomly vary the sort order for more variety
+    const sortOrders = ['TrackID', 'ReplayCount', 'AwardCount', 'AuthorTime', 'UploadedAt'];
+    const randomSort = sortOrders[Math.floor(Math.random() * sortOrders.length)];
+    const randomDirection = Math.random() < 0.5 ? 'ASC' : 'DESC';
+
     const params = new URLSearchParams({
       api: 'on',
       limit: '100', // Fetch 100 maps to choose from
       mtype: 'TM_Race', // Only race maps
-      page: randomPage.toString() // Random page for variety
+      page: randomPage.toString(), // Random page for variety
+      order: randomSort, // Random sort order
+      orderdir: randomDirection // Random direction
     });
+
+    console.log(`[Chess] Fetching maps from TMX page ${randomPage}, sorted by ${randomSort} ${randomDirection}`);
 
     // Apply filters (defaults if not specified)
     if (filters.authortimemax !== undefined) {
