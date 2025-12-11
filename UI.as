@@ -188,7 +188,7 @@ void MainMenu() {
                         }
                         if (UI::IsItemHovered()) {
                             UI::BeginTooltip();
-                            UI::Text("Simulate a race challenge with a random Winter 2025 map");
+                            UI::Text("Simulate a race challenge with a random campaign map");
                             UI::EndTooltip();
                         }
                     }

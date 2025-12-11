@@ -2,9 +2,27 @@
 
 The TrackmaniaChess server now supports customizable map filters that the lobby host can configure before starting a game. This allows for fine-grained control over which maps are selected for race challenges.
 
+## Automatic Blacklists
+
+The server automatically excludes certain types of maps to ensure a good gameplay experience:
+
+### Default Tag Blacklist
+The following TMX tags are **always excluded** from map selection:
+- `Kacky` - Extremely difficult/frustrating maps
+- `LOL` - Joke/meme maps
+
+### Default Name Blacklist
+Maps with the following words in their names are **always filtered out**:
+- `kacky`
+- `lol`
+- `meme`
+- `troll`
+
+These filters are applied automatically and cannot be overridden by lobby hosts. They ensure that only serious, playable racing maps are selected for chess challenges.
+
 ## Developer Blacklist
 
-As the server developer, you can globally blacklist certain authors or mappacks by editing the configuration at the top of `server.js`:
+As the server developer, you can globally blacklist additional authors or mappacks by editing the configuration at the top of `server.js`:
 
 ```javascript
 // ---------- Developer Blacklist Configuration ----------
@@ -138,17 +156,24 @@ When filters are updated, all lobby members receive:
 }
 ```
 
-### No Kacky/Meme Maps
+### Exclude Additional Tags
 ```json
 {
-  "excludeTags": ["Kacky", "LOL", "Meme"],
+  "excludeTags": ["Dirt", "Ice"],
   "authortimemax": 60
 }
 ```
+**Note:** Kacky, LOL, meme, and troll maps are already excluded automatically.
 
 ## Fallback Behavior
 
-If no maps match the filters, or if the TMX API is unavailable, the server falls back to the current Winter 2025 campaign tracks (maps 1-5).
+If no maps match the filters, or if the TMX API is unavailable, the server automatically fetches maps from the current official Trackmania campaign using the TMX API. This ensures that:
+
+1. **Players always have the maps**: Campaign maps are downloaded by all players during regular gameplay
+2. **Auto-updates**: The fallback automatically uses the current season's campaign (e.g., Fall 2025, Winter 2025)
+3. **Reliable**: As official Nadeo maps, they're guaranteed to be available on TMX
+
+If the campaign fetch also fails (extremely rare), the server falls back to hardcoded Winter 2025 campaign maps as a last resort.
 
 ## Implementation Notes
 

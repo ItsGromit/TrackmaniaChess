@@ -36,7 +36,7 @@ async function handleMove(socket, msg) {
       from,
       to,
       promotion,
-      mapUid: map.uid,
+      tmxId: map.tmxId,
       mapName: map.name,
       attacker: socket,
       defender: (socket === game.white) ? game.black : game.white,
@@ -50,7 +50,7 @@ async function handleMove(socket, msg) {
     // Notify both players
     send(challenge.defender, {
       type: 'race_challenge',
-      mapUid: map.uid,
+      tmxId: map.tmxId,
       mapName: map.name,
       isDefender: true,
       from,
@@ -59,7 +59,7 @@ async function handleMove(socket, msg) {
 
     send(challenge.attacker, {
       type: 'race_challenge',
-      mapUid: map.uid,
+      tmxId: map.tmxId,
       mapName: map.name,
       isDefender: false,
       from,
@@ -393,12 +393,12 @@ async function handleRerollResponse(socket, msg) {
 
   const game = games.get(gameId);
   const map = await fetchRandomShortMap(game ? game.mapFilters || {} : {});
-  console.log(`[Chess] Fetched new map: ${map.name} (UID: ${map.uid})`);
+  console.log(`[Chess] Fetched new map: ${map.name} (TMX ID: ${map.tmxId})`);
 
   // Update the race challenge with the new map
   const challenge = raceChallenges.get(gameId);
   if (challenge) {
-    challenge.mapUid = map.uid;
+    challenge.tmxId = map.tmxId;
     challenge.mapName = map.name;
     console.log(`[Chess] Updated race challenge with new map`);
   }
@@ -407,14 +407,14 @@ async function handleRerollResponse(socket, msg) {
   send(requester, {
     type: 'reroll_approved',
     gameId: gameId,
-    mapUid: map.uid,
+    tmxId: map.tmxId,
     mapName: map.name
   });
 
   send(opponent, {
     type: 'reroll_approved',
     gameId: gameId,
-    mapUid: map.uid,
+    tmxId: map.tmxId,
     mapName: map.name
   });
 

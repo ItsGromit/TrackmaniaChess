@@ -43,10 +43,21 @@ async function fetchRandomShortMap(filters = {}) {
       filters.tags.forEach(tag => params.append('tags', tag));
     }
 
-    // Exclude tags
+    // Exclude tags - always exclude Kacky and LOL maps by default
+    const defaultExcludedTags = ['Kacky', 'LOL'];
+    const allExcludedTags = [...defaultExcludedTags];
+
     if (filters.excludeTags && filters.excludeTags.length > 0) {
-      filters.excludeTags.forEach(tag => params.append('etags', tag));
+      // Add user-specified excluded tags
+      filters.excludeTags.forEach(tag => {
+        if (!allExcludedTags.includes(tag)) {
+          allExcludedTags.push(tag);
+        }
+      });
     }
+
+    // Apply all excluded tags
+    allExcludedTags.forEach(tag => params.append('etags', tag));
 
     // Difficulty filter
     if (filters.difficulty) {
@@ -103,14 +114,27 @@ async function fetchRandomShortMap(filters = {}) {
 
           // Check if we got maps (TMX mapsearch2 returns {results: [...]} )
           if (response && response.results && Array.isArray(response.results) && response.results.length > 0) {
-            // Pick a random map from the results for better randomization
-            const randomIndex = Math.floor(Math.random() * response.results.length);
-            const map = response.results[randomIndex];
+            // Filter out maps with blacklisted words in their names
+            const blacklistedWords = ['kacky', 'lol', 'meme', 'troll'];
+            const filteredMaps = response.results.filter(map => {
+              const mapName = (map.GbxMapName || map.Name || '').toLowerCase();
+              return !blacklistedWords.some(word => mapName.includes(word));
+            });
+
+            if (filteredMaps.length === 0) {
+              console.log('[Chess] All maps filtered out by name blacklist, using campaign fallback');
+              resolve(getFallbackMap());
+              return;
+            }
+
+            // Pick a random map from the filtered results
+            const randomIndex = Math.floor(Math.random() * filteredMaps.length);
+            const map = filteredMaps[randomIndex];
             const mapInfo = {
-              uid: map.TrackUID,
+              tmxId: map.TrackID,
               name: map.GbxMapName || map.Name || 'Unknown Map'
             };
-            console.log(`[Chess] Selected random map from TMX (${randomIndex + 1}/${response.results.length}): ${mapInfo.name} (${mapInfo.uid})`);
+            console.log(`[Chess] Selected random map from TMX (${randomIndex + 1}/${filteredMaps.length} after filtering): ${mapInfo.name} (TMX ID: ${mapInfo.tmxId})`);
             resolve(mapInfo);
           } else {
             // Fallback to Winter 2025 campaign maps if API fails
@@ -133,15 +157,84 @@ async function fetchRandomShortMap(filters = {}) {
   });
 }
 
-// Get a fallback map from Winter 2025 campaign
-function getFallbackMap() {
+// Get a fallback map from the current campaign using TMX API
+async function getFallbackMap() {
+  return new Promise((resolve) => {
+    // Fetch from the official Trackmania campaign
+    // Using tags to filter for official campaign maps
+    const params = new URLSearchParams({
+      api: 'on',
+      limit: '25', // Get all campaign maps
+      mtype: 'TM_Race',
+      authorlogin: 'nadeo', // Official Nadeo maps
+      tags: '23', // Campaign tag
+      order: 'TrackID',
+      orderdir: 'DESC' // Get most recent campaign first
+    });
+
+    const options = {
+      hostname: 'trackmania.exchange',
+      path: `/mapsearch2/search?${params.toString()}`,
+      method: 'GET',
+      headers: {
+        'User-Agent': 'TrackmaniaChess/1.0'
+      }
+    };
+
+    console.log('[Chess] Fetching current campaign maps from TMX as fallback');
+
+    const req = https.request(options, (res) => {
+      let data = '';
+
+      res.on('data', (chunk) => {
+        data += chunk;
+      });
+
+      res.on('end', () => {
+        try {
+          const response = JSON.parse(data);
+
+          if (response && response.results && Array.isArray(response.results) && response.results.length > 0) {
+            // Pick a random map from the current campaign
+            const randomIndex = Math.floor(Math.random() * response.results.length);
+            const map = response.results[randomIndex];
+            const mapInfo = {
+              tmxId: map.TrackID,
+              name: map.GbxMapName || map.Name || 'Campaign Map'
+            };
+            console.log(`[Chess] Selected campaign map as fallback: ${mapInfo.name} (TMX ID: ${mapInfo.tmxId})`);
+            resolve(mapInfo);
+          } else {
+            // Last resort hardcoded fallback
+            console.log('[Chess] Could not fetch campaign maps, using hardcoded fallback');
+            resolve(getHardcodedFallback());
+          }
+        } catch (e) {
+          console.error('[Chess] Error parsing campaign fallback response:', e);
+          resolve(getHardcodedFallback());
+        }
+      });
+    });
+
+    req.on('error', (e) => {
+      console.error('[Chess] Error fetching campaign maps:', e);
+      resolve(getHardcodedFallback());
+    });
+
+    req.end();
+  });
+}
+
+// Last resort hardcoded fallback (Winter 2025 campaign maps - TMX IDs)
+function getHardcodedFallback() {
   const fallbackMaps = [
-    { uid: 'J3RyKSumRDcpqxza1y8PzvRitLl', name: 'Winter 2025 - 01' },
-    { uid: 'OzeeWxmRNIeCiHEPQHiHaffNjEj', name: 'Winter 2025 - 02' },
-    { uid: 'shPSqDL3bQ6nU6QmpHxJ_dVsI6k', name: 'Winter 2025 - 03' },
-    { uid: 'YPRoZqXOe_fTPJpNKNFOd1IlRel', name: 'Winter 2025 - 04' },
-    { uid: 'J0PHqGv4XovUkVOt5gTzzZQAk7d', name: 'Winter 2025 - 05' }
+    { tmxId: 216544, name: 'Winter 2025 - 01' },
+    { tmxId: 216545, name: 'Winter 2025 - 02' },
+    { tmxId: 216546, name: 'Winter 2025 - 03' },
+    { tmxId: 216547, name: 'Winter 2025 - 04' },
+    { tmxId: 216548, name: 'Winter 2025 - 05' }
   ];
+  console.log('[Chess] Using hardcoded Winter 2025 campaign map as last resort');
   return fallbackMaps[Math.floor(Math.random() * fallbackMaps.length)];
 }
 

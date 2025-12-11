@@ -5,7 +5,7 @@ const games = new Map();     // gameId -> { white:Socket, black:Socket, chess:Ch
 const lobbies = new Map();   // lobbyId -> { id, host:Socket, players:Socket[], playerNames:string[], password:string, open:boolean, mapFilters:Object }
 const clients = new Set();   // connected sockets
 const lastOpponents = new Map(); // socket -> opponent socket (for rematch after game ends)
-const raceChallenges = new Map(); // gameId -> { from, to, mapUid, mapName, defenderTime, defenderSocket, attackerSocket }
+const raceChallenges = new Map(); // gameId -> { from, to, tmxId, mapName, defenderTime, defenderSocket, attackerSocket }
 const rematchRequests = new Map(); // socket -> { requester:Socket, opponent:Socket, gameId:string }
 const rerollRequests = new Map(); // socket -> { requester:Socket, opponent:Socket, gameId:string }
 
