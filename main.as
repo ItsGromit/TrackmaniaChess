@@ -14,6 +14,9 @@ void OnDestroyed() {
 }
 
 void Render() {
+    // Render color customization window independently
+    ColorCustomization::RenderWindow();
+
     if (!showWindow) return;
     EnsurePieceAssetsLoaded();
 

@@ -125,8 +125,7 @@ void MainMenu() {
                     UI::Text(themeSectionLabelColor + "Window Settings:");
                     UI::NewLine();
 
-                    // Window resize toggle (moved from top right for settings page)
-                    string settingsLockText = windowResizeable ? "Window is Unlocked" : "Window is Locked";
+                    // Window resize toggle
                     string settingsButtonText = windowResizeable ? "Lock Window Size" : "Unlock Window Size";
                     UI::Text(settingsLockText);
                     if (StyledButton(settingsButtonText, vec2(150.0f, 0))) {
@@ -134,30 +133,12 @@ void MainMenu() {
                     }
 
                     UI::NewLine();
-                    UI::NewLine();
 
                     // Theme Settings Section
                     UI::Text(themeSectionLabelColor + "Theme Settings:");
-                    UI::NewLine();
 
-                    UI::Text("Button Color (Active):");
-                    vec3 activeColor = vec3(themeActiveTabColor.x, themeActiveTabColor.y, themeActiveTabColor.z);
-                    if (UI::ColorEdit3("##activecolor", activeColor)) {
-                        themeActiveTabColor = vec4(activeColor.x, activeColor.y, activeColor.z, 1.0f);
-                    }
-
-                    UI::Text("Button Color (Inactive):");
-                    vec3 inactiveColor = vec3(themeInactiveTabColor.x, themeInactiveTabColor.y, themeInactiveTabColor.z);
-                    if (UI::ColorEdit3("##inactivecolor", inactiveColor)) {
-                        themeInactiveTabColor = vec4(inactiveColor.x, inactiveColor.y, inactiveColor.z, 1.0f);
-                    }
-
-                    UI::NewLine();
-
-                    // Reset to default colors button
-                    if (StyledButton("Reset Colors to Default", vec2(200.0f, 0))) {
-                        themeActiveTabColor = vec4(0.2f, 0.5f, 0.8f, 1.0f);
-                        themeInactiveTabColor = vec4(0.26f, 0.26f, 0.26f, 1.0f);
+                    if (StyledButton("Customize Colors", vec2(200.0f, 30.0f))) {
+                        showColorCustomizationWindow = true;
                     }
 
                     // Developer Mode Section - Disabled for release
@@ -532,13 +513,13 @@ void BoardRender() {
 
             // Square color
             bool isLight = (row + col) % 2 == 0;
-            vec4 squareColor = isLight ? vec4(0.9, 0.9, 0.8, 0.4) : vec4(0.5, 0.4, 0.3, 0.4);
+            vec4 squareColor = isLight ? boardLightSquareColor : boardDarkSquareColor;
 
             // Only show highlights when it's the player's turn
             if (GameManager::isLocalPlayerTurn()) {
                 // Highlight selected square
                 if (selectedRow == row && selectedCol == col) {
-                    squareColor = vec4(0.3, 0.7, 0.3, 1);
+                    squareColor = boardSelectedSquareColor;
                 }
 
                 // Highlight valid moves (your existing local preview remains)
@@ -554,7 +535,7 @@ void BoardRender() {
                         board[row][col] = temp;
 
                         if (!wouldBeInCheck) {
-                            squareColor = vec4(0.7, 0.9, 0.7, 0.4);
+                            squareColor = boardValidMoveColor;
                         }
                     }
                 }
