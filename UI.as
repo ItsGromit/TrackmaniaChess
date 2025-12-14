@@ -19,50 +19,16 @@ void MainMenu() {
 
         switch (GameManager::currentState) {
             case GameState::Menu: {
-                // navigation bar
-                float tabButtonWidth = 80.0f;
+                // Top bar with tabs and lock button - same height as other states
                 float lockButtonWidth = 30.0f;
+                float barHeight = 30.0f;
+                vec2 contentAvail = UI::GetContentRegionAvail();
+                vec2 barCursor = UI::GetCursorPos();
 
-                // Home tab
-                vec4 homeColor = currentMenuTab == MenuTab::Home ? themeActiveTabColor : themeInactiveTabColor;
-                UI::PushStyleColor(UI::Col::Button, homeColor);
-                UI::PushStyleColor(UI::Col::ButtonActive, themeActiveTabColor);
-                if (UI::Button("Home", vec2(tabButtonWidth, 30.0f))) {
-                    currentMenuTab = MenuTab::Home;
-                }
-                UI::PopStyleColor(2);
-
-                UI::SameLine();
-
-                // Play tab
-                vec4 playColor = currentMenuTab == MenuTab::Play ? themeActiveTabColor : themeInactiveTabColor;
-                UI::PushStyleColor(UI::Col::Button, playColor);
-                UI::PushStyleColor(UI::Col::ButtonActive, themeActiveTabColor);
-                if (UI::Button("Play", vec2(tabButtonWidth, 30.0f))) {
-                    currentMenuTab = MenuTab::Play;
-                }
-                UI::PopStyleColor(2);
-
-                UI::SameLine();
-
-                // Settings tab
-                vec4 settingsColor = currentMenuTab == MenuTab::Settings ? themeActiveTabColor : themeInactiveTabColor;
-                UI::PushStyleColor(UI::Col::Button, settingsColor);
-                UI::PushStyleColor(UI::Col::ButtonActive, themeActiveTabColor);
-                if (UI::Button("Settings", vec2(tabButtonWidth, 30.0f))) {
-                    currentMenuTab = MenuTab::Settings;
-                }
-                UI::PopStyleColor(2);
-
-                UI::SameLine();
-
-                // Lock/Unlock button aligned with navigation bar
-                vec2 availRegion = UI::GetContentRegionAvail();
-                vec2 currentCursorPos = UI::GetCursorPos();
-                UI::SetCursorPos(vec2(currentCursorPos.x + availRegion.x - lockButtonWidth, currentCursorPos.y));
+                // Lock button at right
+                UI::SetCursorPos(vec2(barCursor.x + contentAvail.x - lockButtonWidth, barCursor.y));
                 string lockText = windowResizeable ? Icons::Unlock : Icons::Lock;
-                if (UI::Button(lockText, vec2(lockButtonWidth, 30.0f))) {
-                    // Check if Shift is held - if so, reset window to default size and lock it
+                if (UI::Button(lockText + "##menu", vec2(lockButtonWidth, barHeight))) {
                     if (UI::IsKeyDown(UI::Key::LeftShift) || UI::IsKeyDown(UI::Key::RightShift)) {
                         UI::SetWindowSize(vec2(defaultWidth, defaultHeight));
                         windowResizeable = false;
@@ -80,21 +46,45 @@ void MainMenu() {
                     UI::EndTooltip();
                 }
 
-                UI::Separator();
+                // Reset cursor and add tab buttons as left-aligned elements
+                UI::SetCursorPos(barCursor);
+
+                // Home tab
+                UI::PushStyleColor(UI::Col::Button, currentMenuTab == MenuTab::Home ? themeActiveTabColor : themeInactiveTabColor);
+                UI::PushStyleColor(UI::Col::ButtonHovered, themeActiveTabColor);
+                UI::PushStyleColor(UI::Col::ButtonActive, themeActiveTabColor);
+                if (UI::Button("Home", vec2(80.0f, barHeight))) {
+                    currentMenuTab = MenuTab::Home;
+                }
+                UI::PopStyleColor(3);
+
+                UI::SameLine();
+
+                // Play tab
+                UI::PushStyleColor(UI::Col::Button, currentMenuTab == MenuTab::Play ? themeActiveTabColor : themeInactiveTabColor);
+                UI::PushStyleColor(UI::Col::ButtonHovered, themeActiveTabColor);
+                UI::PushStyleColor(UI::Col::ButtonActive, themeActiveTabColor);
+                if (UI::Button("Play", vec2(80.0f, barHeight))) {
+                    currentMenuTab = MenuTab::Play;
+                }
+                UI::PopStyleColor(3);
+
+                UI::SameLine();
+
+                // Settings tab
+                UI::PushStyleColor(UI::Col::Button, currentMenuTab == MenuTab::Settings ? themeActiveTabColor : themeInactiveTabColor);
+                UI::PushStyleColor(UI::Col::ButtonHovered, themeActiveTabColor);
+                UI::PushStyleColor(UI::Col::ButtonActive, themeActiveTabColor);
+                if (UI::Button("Settings", vec2(80.0f, barHeight))) {
+                    currentMenuTab = MenuTab::Settings;
+                }
+                UI::PopStyleColor(3);
+
                 UI::NewLine();
 
                 // Tab content
                 if (currentMenuTab == MenuTab::Home) {
                     // Home tab - Rules and information
-                vec2 contentRegion = UI::GetContentRegionAvail();
-                string titleText = "Chess Race";
-                float titleWidth = Draw::MeasureString(titleText).x;
-                vec2 currentPos = UI::GetCursorPos();
-                UI::SetCursorPos(vec2(currentPos.x + (contentRegion.x - titleWidth) * 0.5f, currentPos.y));
-                UI::Text(titleText);
-                UI::Separator();
-                    UI::NewLine();
-
                     UI::TextWrapped("Welcome to Chess Race! This is a competitive chess game where you can play against other players online.");
                     UI::NewLine();
                     UI::Text("\\$f80Rules:");
@@ -124,17 +114,6 @@ void MainMenu() {
                         }
                     }
 
-                    // Show lobby browser UI with centered title
-                    vec2 contentRegion = UI::GetContentRegionAvail();
-                    string titleText = "Lobby Browser";
-                    float titleWidth = Draw::MeasureString(titleText).x;
-                    vec2 currentPos = UI::GetCursorPos();
-                    UI::SetCursorPos(vec2(currentPos.x + (contentRegion.x - titleWidth) * 0.5f, currentPos.y));
-                    UI::Text(titleText);
-                    UI::NewLine();
-                    UI::Separator();
-                    UI::NewLine();
-
                     // Render create lobby UI
                     Lobby::RenderCreateLobby();
 
@@ -143,31 +122,50 @@ void MainMenu() {
 
                 } else if (currentMenuTab == MenuTab::Settings) {
                     // Settings tab
-                    vec2 contentRegion = UI::GetContentRegionAvail();
-                    string titleText = "Settings";
-                    float titleWidth = Draw::MeasureString(titleText).x;
-                    vec2 currentPos = UI::GetCursorPos();
-                    UI::SetCursorPos(vec2(currentPos.x + (contentRegion.x - titleWidth) * 0.5f, currentPos.y));
-                    UI::Text(titleText);
-                    UI::Separator();
-                    UI::NewLine();
-
-                    UI::Text("Window Settings:");
+                    UI::Text(themeSectionLabelColor + "Window Settings:");
                     UI::NewLine();
 
                     // Window resize toggle (moved from top right for settings page)
                     string settingsLockText = windowResizeable ? "Window is Unlocked" : "Window is Locked";
                     string settingsButtonText = windowResizeable ? "Lock Window Size" : "Unlock Window Size";
                     UI::Text(settingsLockText);
-                    if (UI::Button(settingsButtonText, vec2(150.0f, 0))) {
+                    if (StyledButton(settingsButtonText, vec2(150.0f, 0))) {
                         windowResizeable = !windowResizeable;
                     }
 
                     UI::NewLine();
-                    UI::Separator();
                     UI::NewLine();
 
-                    // Developer Mode Section
+                    // Theme Settings Section
+                    UI::Text(themeSectionLabelColor + "Theme Settings:");
+                    UI::NewLine();
+
+                    UI::Text("Button Color (Active):");
+                    vec3 activeColor = vec3(themeActiveTabColor.x, themeActiveTabColor.y, themeActiveTabColor.z);
+                    if (UI::ColorEdit3("##activecolor", activeColor)) {
+                        themeActiveTabColor = vec4(activeColor.x, activeColor.y, activeColor.z, 1.0f);
+                    }
+
+                    UI::Text("Button Color (Inactive):");
+                    vec3 inactiveColor = vec3(themeInactiveTabColor.x, themeInactiveTabColor.y, themeInactiveTabColor.z);
+                    if (UI::ColorEdit3("##inactivecolor", inactiveColor)) {
+                        themeInactiveTabColor = vec4(inactiveColor.x, inactiveColor.y, inactiveColor.z, 1.0f);
+                    }
+
+                    UI::NewLine();
+
+                    // Reset to default colors button
+                    if (StyledButton("Reset Colors to Default", vec2(200.0f, 0))) {
+                        themeActiveTabColor = vec4(0.2f, 0.5f, 0.8f, 1.0f);
+                        themeInactiveTabColor = vec4(0.26f, 0.26f, 0.26f, 1.0f);
+                    }
+
+                    // Developer Mode Section - Disabled for release
+                    // Uncomment to enable developer mode for testing
+                    /*
+                    UI::NewLine();
+                    UI::NewLine();
+
                     UI::Text(themeSectionLabelColor + "Developer Settings:");
                     UI::NewLine();
 
@@ -192,6 +190,7 @@ void MainMenu() {
                             UI::EndTooltip();
                         }
                     }
+                    */
                 }
 
                 break;
@@ -229,7 +228,6 @@ void MainMenu() {
                 UI::SetCursorPos(lockCursor);
                 UI::Dummy(vec2(0, barHeight));
 
-                UI::Separator();
                 UI::NewLine();
 
                 UI::Text("Connecting to server...");
@@ -268,7 +266,6 @@ void MainMenu() {
                 UI::SetCursorPos(lockCursor);
                 UI::Dummy(vec2(0, barHeight));
 
-                UI::Separator();
                 UI::NewLine();
 
                 // Render create lobby UI
@@ -277,7 +274,7 @@ void MainMenu() {
                 // Show lobby list
                 Lobby::RenderLobbyList();
 
-                if (UI::Button("Back to Menu")) {
+                if (StyledButton("Back to Menu")) {
                     GameManager::currentState = GameState::Menu;
                 }
                 break;
@@ -319,7 +316,6 @@ void MainMenu() {
                 UI::Button("Lobby", vec2(80.0f, barHeight));
                 UI::PopStyleColor(3);
 
-                UI::Separator();
                 UI::NewLine();
 
                 // Render the current lobby details
@@ -372,7 +368,7 @@ void MainMenu() {
             UI::SetCursorPos(lockCursor);
             UI::Dummy(vec2(0, barHeight));
 
-            UI::Separator();
+            UI::NewLine();
 
             if (!gameOver) {
                 // Game info
@@ -395,35 +391,15 @@ void MainMenu() {
                 UI::Text("\\$ff0Game over!" + gameResult);
             }
 
-            UI::Separator();
-
             vec2 contentRegion = UI::GetContentRegionAvail();
 
             float moveHistoryWidth = 150.0f;
-            float spacing = 10.0f;
-
-            float labelSize = 20.0f;
-
             float belowBoardUIHeight = 30.0f;
             float availableHeight = contentRegion.y - belowBoardUIHeight;
-
-            float availableWidth = contentRegion.x - moveHistoryWidth - spacing - labelSize - 20.0f;
-
-            float maxBoardSize = Math::Min(availableWidth, availableHeight);
-            maxBoardSize = Math::Max(maxBoardSize, 80.0f);
-
-            if (maxBoardSize > availableHeight) {
-                maxBoardSize = availableHeight;
-            }
-
-            float squareSize = maxBoardSize / 8.0f;
-
-            bool flipBoard = (Network::gameId != "" && !Network::isWhite);
 
             UI::BeginGroup();
             UI::BeginChild("MoveHistory", vec2(moveHistoryWidth, availableHeight - 40.0f), true);
             UI::Text("Move History:");
-            UI::Separator();
             for (uint i = 0; i < moveHistory.Length; i++) {
                 Move@ m = moveHistory[i];
                 string moveText = "" + (i + 1) + ". " +
@@ -437,7 +413,7 @@ void MainMenu() {
             if (GameManager::currentState == GameState::Playing && !gameOver) {
                 vec2 buttonCursor = UI::GetCursorPos();
                 UI::SetCursorPos(vec2(buttonCursor.x, buttonCursor.y + 30.0f));
-                if (UI::Button("Forfeit", vec2(moveHistoryWidth, belowBoardUIHeight))) {
+                if (StyledButton("Forfeit", vec2(moveHistoryWidth, belowBoardUIHeight))) {
                     Network::Resign();
                 }
             }
@@ -449,27 +425,27 @@ void MainMenu() {
                 if (rematchRequestReceived) {
                     // Opponent requested rematch - show accept/decline buttons
                     UI::Text(themeSuccessTextColor + "Opponent wants a rematch!");
-                    if (UI::Button("Accept Rematch", vec2(moveHistoryWidth, belowBoardUIHeight))) {
+                    if (StyledButton("Accept Rematch", vec2(moveHistoryWidth, belowBoardUIHeight))) {
                         Network::RespondToRematch(true);
                     }
-                    if (UI::Button("Decline", vec2(moveHistoryWidth, belowBoardUIHeight))) {
+                    if (StyledButton("Decline", vec2(moveHistoryWidth, belowBoardUIHeight))) {
                         Network::RespondToRematch(false);
                     }
                 } else if (rematchRequestSent) {
                     // Waiting for opponent to respond
                     UI::Text(themeWarningTextColor + "Waiting for opponent...");
-                    if (UI::Button("Cancel Request", vec2(moveHistoryWidth, belowBoardUIHeight))) {
+                    if (StyledButton("Cancel Request", vec2(moveHistoryWidth, belowBoardUIHeight))) {
                         rematchRequestSent = false;
                         UI::ShowNotification("Chess", "Rematch request cancelled", vec4(0.8,0.8,0.2,1), 3000);
                     }
                 } else {
                     // Normal state - show rematch button
-                    if (UI::Button("Request Rematch", vec2(moveHistoryWidth, belowBoardUIHeight))) {
+                    if (StyledButton("Request Rematch", vec2(moveHistoryWidth, belowBoardUIHeight))) {
                         Network::RequestNewGame();
                     }
                 }
 
-                if (UI::Button("Back to menu", vec2(moveHistoryWidth, belowBoardUIHeight))) {
+                if (StyledButton("Back to menu", vec2(moveHistoryWidth, belowBoardUIHeight))) {
                     Network::LeaveLobby();
                     GameManager::currentState = GameState::Menu;
                     rematchRequestReceived = false;

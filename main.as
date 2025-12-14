@@ -49,6 +49,13 @@ void RenderRaceWindow() {
         if (UI::Button("Re-roll Map", vec2(200.0f, 0))) {
             Network::TestRerollMap();
         }
+        if (UI::Button("Return to Menu", vec2(200.0f, 0))) {
+            auto app = cast<CTrackMania>(GetApp());
+            if (app !is null) {
+                app.BackToMainMenu();
+                GameManager::currentState = GameState::Menu;
+            }
+        }
     } else {
         // Normal multiplayer mode with request/response
         if (rerollRequestReceived) {

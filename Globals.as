@@ -62,6 +62,16 @@ string ui_serverPort = "";
 [Setting category="Developer" name="Enable Developer Mode"]
 bool developerMode = false;
 
+// Styled button helper - applies theme colors to buttons
+bool StyledButton(const string &in label, const vec2 &in size = vec2(0, 0), bool isActive = false) {
+    UI::PushStyleColor(UI::Col::Button, isActive ? themeActiveTabColor : themeInactiveTabColor);
+    UI::PushStyleColor(UI::Col::ButtonHovered, themeActiveTabColor);
+    UI::PushStyleColor(UI::Col::ButtonActive, themeActiveTabColor);
+    bool clicked = UI::Button(label, size);
+    UI::PopStyleColor(3);
+    return clicked;
+}
+
 // race variables
 uint64 raceStartedAt = 0;
 

@@ -16,6 +16,16 @@ namespace Network {
     bool isWhite = false;
     bool isHost = false;
 
+    // ================
+    // Map Filter variables
+    // ================
+    int mapFilterAuthorTimeMax = 300; // No real limit by default (5 minutes max)
+    int mapFilterAuthorTimeMin = 0;
+    array<string> mapFilterSelectedTags;
+    array<string> mapFilterBlacklistedTags = {"Kacky", "LOL"}; // Default blacklist
+    bool mapFiltersChanged = false;
+    bool useTagWhitelist = false; // Default to blacklist mode with Kacky and LOL excluded
+
     // ==============
     // Race variables
     // ==============
@@ -271,6 +281,27 @@ namespace Network {
         SendJson(j);
     }
 
+    // ===================
+    // Map Filter functions
+    // ===================
+    void SetMapFilters(const string &in lobbyId, Json::Value &in filters) {
+        if (lobbyId.Length == 0) return;
+        Json::Value j = Json::Object();
+        j["type"] = "set_map_filters";
+        j["lobbyId"] = lobbyId;
+        j["filters"] = filters;
+        print("[Chess] Setting map filters for lobby: " + lobbyId);
+        SendJson(j);
+    }
+
+    void GetMapFilters(const string &in lobbyId) {
+        if (lobbyId.Length == 0) return;
+        Json::Value j = Json::Object();
+        j["type"] = "get_map_filters";
+        j["lobbyId"] = lobbyId;
+        SendJson(j);
+    }
+
     // ========
     // Messages
     // ========
@@ -321,6 +352,8 @@ namespace Network {
                 // Transition to InLobby state when joining
                 if (currentLobbyId.Length > 0 && GameManager::currentState == GameState::InQueue) {
                     GameManager::currentState = GameState::InLobby;
+                    // Request current map filters when joining lobby
+                    GetMapFilters(currentLobbyId);
                 }
             }
         }
@@ -450,10 +483,64 @@ namespace Network {
             UI::ShowNotification("Chess", "Loading new map: " + raceMapName, vec4(0.2,0.8,0.2,1), 5000);
 
             DownloadAndLoadMapFromTMX(raceMapTmxId, raceMapName);
+        } else if (t == "map_filters_updated") {
+            print("[Chess] Map filters updated for lobby");
+            // Update local filter values from server
+            if (msg.HasKey("filters")) {
+                auto filters = msg["filters"];
+                if (filters.HasKey("authortimemax")) {
+                    mapFilterAuthorTimeMax = int(filters["authortimemax"]);
+                }
+                if (filters.HasKey("authortimemin")) {
+                    mapFilterAuthorTimeMin = int(filters["authortimemin"]);
+                }
+                if (filters.HasKey("tags")) {
+                    mapFilterSelectedTags.Resize(0);
+                    auto tagsArray = filters["tags"];
+                    for (uint i = 0; i < tagsArray.Length; i++) {
+                        mapFilterSelectedTags.InsertLast(string(tagsArray[i]));
+                    }
+                }
+                if (filters.HasKey("excludeTags")) {
+                    mapFilterBlacklistedTags.Resize(0);
+                    auto excludeTagsArray = filters["excludeTags"];
+                    for (uint i = 0; i < excludeTagsArray.Length; i++) {
+                        mapFilterBlacklistedTags.InsertLast(string(excludeTagsArray[i]));
+                    }
+                }
+            }
+        } else if (t == "map_filters") {
+            print("[Chess] Received current map filters");
+            // Update local filter values from server
+            if (msg.HasKey("filters")) {
+                auto filters = msg["filters"];
+                if (filters.HasKey("authortimemax")) {
+                    mapFilterAuthorTimeMax = int(filters["authortimemax"]);
+                }
+                if (filters.HasKey("authortimemin")) {
+                    mapFilterAuthorTimeMin = int(filters["authortimemin"]);
+                }
+                if (filters.HasKey("tags")) {
+                    mapFilterSelectedTags.Resize(0);
+                    auto tagsArray = filters["tags"];
+                    for (uint i = 0; i < tagsArray.Length; i++) {
+                        mapFilterSelectedTags.InsertLast(string(tagsArray[i]));
+                    }
+                }
+                if (filters.HasKey("excludeTags")) {
+                    mapFilterBlacklistedTags.Resize(0);
+                    auto excludeTagsArray = filters["excludeTags"];
+                    for (uint i = 0; i < excludeTagsArray.Length; i++) {
+                        mapFilterBlacklistedTags.InsertLast(string(excludeTagsArray[i]));
+                    }
+                }
+            }
         } else if (t == "error") {
             string errorCode = string(msg["code"]);
             if (errorCode == "REMATCH_ALREADY_SENT") {
                 UI::ShowNotification("Chess", "You have already sent a rematch request", vec4(1,0.4,0.4,1), 4000);
+            } else if (errorCode == "INVALID_PLAYER_COUNT") {
+                UI::ShowNotification("Chess", "Need exactly 2 players to start the game", vec4(1,0.4,0.4,1), 4000);
             } else {
                 UI::ShowNotification("Chess", "Error: " + errorCode, vec4(1,0.4,0.4,1), 4000);
             }
@@ -627,51 +714,10 @@ namespace Network {
         DownloadAndLoadMapFromTMX(tmxId, raceMapName);
     }
 
-    // Download and load a map from TMX by its TMX ID
-    void DownloadAndLoadMapFromTMX(int tmxId, const string &in mapName) {
-        print("[Chess] Downloading map from TMX ID: " + tmxId);
+    // Load a map from TMX by its TMX ID (without permanently downloading it)
+    void DownloadAndLoadMapFromTMX(int tmxId, const string &in mapName = "") {
+        print("[Chess] Loading map from TMX ID: " + tmxId + (mapName.Length > 0 ? " (" + mapName + ")" : ""));
 
-        string downloadUrl = "https://trackmania.exchange/maps/download/" + tmxId;
-
-        auto downloadReq = Net::HttpRequest();
-        downloadReq.Url = downloadUrl;
-        downloadReq.Method = Net::HttpMethod::Get;
-        downloadReq.Headers['User-Agent'] = "TrackmaniaChess/1.0 (Openplanet)";
-        downloadReq.Start();
-
-        // Wait for download to complete
-        while (!downloadReq.Finished()) {
-            yield();
-        }
-
-        if (downloadReq.ResponseCode() != 200) {
-            print("[Chess] ERROR: Failed to download map from TMX. HTTP code: " + downloadReq.ResponseCode());
-            UI::ShowNotification("Chess", "Failed to download map", vec4(1,0.4,0.4,1), 4000);
-            return;
-        }
-
-        string mapFileData = downloadReq.String();
-        print("[Chess] Map downloaded successfully (" + mapFileData.Length + " bytes)");
-
-        // Save the map to the Downloaded folder
-        string tempMapPath = IO::FromUserGameFolder("Maps/Downloaded/ChessRace_" + tmxId + ".Map.Gbx");
-
-        // Create directory if it doesn't exist
-        string dir = IO::FromUserGameFolder("Maps/Downloaded/");
-        if (!IO::FolderExists(dir)) {
-            IO::CreateFolder(dir);
-            print("[Chess] Created download directory: " + dir);
-        }
-
-        // Write the map file
-        IO::File file;
-        file.Open(tempMapPath, IO::FileMode::Write);
-        file.Write(mapFileData);
-        file.Close();
-
-        print("[Chess] Map saved to: " + tempMapPath);
-
-        // Now load the downloaded map
         auto app = cast<CTrackMania>(GetApp());
         if (app is null) {
             print("[Chess] Error: Could not get app instance for loading");
@@ -698,13 +744,17 @@ namespace Network {
 
         auto maniaTitleAPI = app.ManiaTitleControlScriptAPI;
         if (maniaTitleAPI !is null) {
-            print("[Chess] Loading downloaded map: " + mapName);
-            maniaTitleAPI.PlayMap(tempMapPath, "TrackMania/TM_PlayMap_Local", "");
+            // Load map directly from TMX URL without saving to disk
+            // This is what MXRandom and other plugins do
+            string mapUrl = "https://trackmania.exchange/maps/download/" + tmxId;
+            print("[Chess] Loading map from URL: " + mapUrl);
+
+            maniaTitleAPI.PlayMap(mapUrl, "TrackMania/TM_PlayMap_Local", "");
 
             sleep(3000);
             auto result = cast<CSmArenaClient>(app.CurrentPlayground);
             if (result !is null) {
-                print("[Chess] SUCCESS: Map loaded!");
+                print("[Chess] SUCCESS: Map loaded from TMX!");
             } else {
                 print("[Chess] Map loading - please wait...");
             }

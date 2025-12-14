@@ -125,12 +125,20 @@ function handleStartGame(socket, msg) {
   const l = lobbies.get(msg.lobbyId);
   if (!l) return;
   if (l.host !== socket) return; // only host can start
-  if (l.players.length < 1) return; // need at least 1 player
+  if (l.players.length !== 2) {
+    // Game requires exactly 2 players
+    send(socket, {
+      type: 'error',
+      code: 'INVALID_PLAYER_COUNT',
+      message: 'Need exactly 2 players to start the game'
+    });
+    return;
+  }
 
   const gameId = Math.random().toString(36).slice(2, 9);
   const chess = new Chess();
   const p1 = l.players[0];
-  const p2 = l.players.length >= 2 ? l.players[1] : null;
+  const p2 = l.players[1];
 
   // Randomly assign colors
   const p1IsWhite = Math.random() < 0.5;
@@ -150,20 +158,18 @@ function handleStartGame(socket, msg) {
     type: 'game_start',
     gameId,
     isWhite: p1IsWhite,
-    opponentId: p2 ? p2.id : null,
+    opponentId: p2.id,
     fen: chess.fen(),
     turn: 'w'
   });
-  if (p2) {
-    send(p2, {
-      type: 'game_start',
-      gameId,
-      isWhite: !p1IsWhite,
-      opponentId: p1.id,
-      fen: chess.fen(),
-      turn: 'w'
-    });
-  }
+  send(p2, {
+    type: 'game_start',
+    gameId,
+    isWhite: !p1IsWhite,
+    opponentId: p1.id,
+    fen: chess.fen(),
+    turn: 'w'
+  });
 
   // Keep the lobby alive for rematches instead of deleting it
   // Mark the lobby as "in game" so it doesn't show in the lobby list

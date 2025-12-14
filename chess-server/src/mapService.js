@@ -27,11 +27,9 @@ async function fetchRandomShortMap(filters = {}) {
 
     console.log(`[Chess] Fetching maps from TMX page ${randomPage}, sorted by ${randomSort} ${randomDirection}`);
 
-    // Apply filters (defaults if not specified)
+    // Apply filters (no defaults - player has full control)
     if (filters.authortimemax !== undefined) {
       params.append('authortimemax', filters.authortimemax);
-    } else {
-      params.append('authortimemax', '60'); // Default: 60 seconds
     }
 
     if (filters.authortimemin !== undefined) {
@@ -39,7 +37,9 @@ async function fetchRandomShortMap(filters = {}) {
     }
 
     // Tag filtering (include specific tags)
+    // Use OR mode so maps match if they have AT LEAST ONE of the selected tags
     if (filters.tags && filters.tags.length > 0) {
+      params.append('tagmode', '0'); // 0 = OR mode (at least one tag), 1 = AND mode (all tags)
       filters.tags.forEach(tag => params.append('tags', tag));
     }
 
@@ -114,27 +114,14 @@ async function fetchRandomShortMap(filters = {}) {
 
           // Check if we got maps (TMX mapsearch2 returns {results: [...]} )
           if (response && response.results && Array.isArray(response.results) && response.results.length > 0) {
-            // Filter out maps with blacklisted words in their names
-            const blacklistedWords = ['kacky', 'lol', 'meme', 'troll'];
-            const filteredMaps = response.results.filter(map => {
-              const mapName = (map.GbxMapName || map.Name || '').toLowerCase();
-              return !blacklistedWords.some(word => mapName.includes(word));
-            });
-
-            if (filteredMaps.length === 0) {
-              console.log('[Chess] All maps filtered out by name blacklist, using campaign fallback');
-              resolve(getFallbackMap());
-              return;
-            }
-
-            // Pick a random map from the filtered results
-            const randomIndex = Math.floor(Math.random() * filteredMaps.length);
-            const map = filteredMaps[randomIndex];
+            // Pick a random map from the results
+            const randomIndex = Math.floor(Math.random() * response.results.length);
+            const map = response.results[randomIndex];
             const mapInfo = {
               tmxId: map.TrackID,
               name: map.GbxMapName || map.Name || 'Unknown Map'
             };
-            console.log(`[Chess] Selected random map from TMX (${randomIndex + 1}/${filteredMaps.length} after filtering): ${mapInfo.name} (TMX ID: ${mapInfo.tmxId})`);
+            console.log(`[Chess] Selected random map from TMX (${randomIndex + 1}/${response.results.length}): ${mapInfo.name} (TMX ID: ${mapInfo.tmxId})`);
             resolve(mapInfo);
           } else {
             // Fallback to Winter 2025 campaign maps if API fails
