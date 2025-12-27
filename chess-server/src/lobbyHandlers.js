@@ -9,15 +9,17 @@ function handleCreateLobby(socket, msg) {
   const id = msg.lobbyId || msg.roomCode || Math.random().toString(36).slice(2, 9).toUpperCase();
   const lobby = {
     id,
+    title: msg.title || "",  // Store the lobby title
     host: socket,
     players: [socket],
     playerNames: [msg.playerName || socket.id],
     password: msg.password || "",
     open: true,
+    raceMode: msg.raceMode || "capture",  // Store race mode
     mapFilters: {} // Initialize with empty filters (will use defaults)
   };
   lobbies.set(id, lobby);
-  console.log(`[Lobby] Created lobby ${id} for socket ${socket.id}, sending confirmation...`);
+  console.log(`[Lobby] Created lobby ${id}${lobby.title ? ` (${lobby.title})` : ''} [${lobby.raceMode}] for socket ${socket.id}, sending confirmation...`);
   const confirmation = { type: 'lobby_created', lobbyId: id };
   console.log('[Lobby] Sending confirmation:', JSON.stringify(confirmation));
   send(socket, confirmation);
@@ -30,11 +32,13 @@ function handleListLobbies(socket, msg) {
   for (const [id, l] of lobbies.entries()) {
     lobbyList.push({
       id,
+      title: l.title || "",  // Include title in lobby list
       hostId: l.host.id,
       players: l.players.length,
       open: l.open,
       hasPassword: !!l.password,
-      playerNames: l.playerNames
+      playerNames: l.playerNames,
+      raceMode: l.raceMode || "capture"  // Include race mode
     });
   }
   send(socket, { type: 'lobby_list', lobbies: lobbyList });

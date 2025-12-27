@@ -1,8 +1,8 @@
 [meta]
-name = "Chess Race"
+name = "Chess Race Classic"
 author = "ItsGromit"
 category = "Game"
-version = "0.8"
+version = "0.9"
 siteid = ""
 
 [package]

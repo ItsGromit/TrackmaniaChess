@@ -45,8 +45,3 @@ const server = net.createServer((socket) => {
 server.listen(TCP_PORT, () => {
   console.log(`Authoritative TCP chess server listening on ${TCP_PORT}`);
 });
-
-// Periodic stats logging
-setInterval(() => {
-  console.log(`[Stats] Active games: ${games.size}, Open lobbies: ${lobbies.size}, Connected clients: ${clients.size}`);
-}, STATS_INTERVAL);

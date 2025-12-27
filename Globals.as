@@ -76,6 +76,21 @@ string ui_serverPort = "";
 [Setting category="Developer" name="Enable Developer Mode"]
 bool developerMode = false;
 
+// Race Mode Selection
+enum RaceMode {
+    SquareRace,      // New mode: Each square has assigned map, race when clicking
+    CaptureRace      // Classic mode: Race only when capturing pieces
+}
+
+RaceMode currentRaceMode = RaceMode::SquareRace;  // New mode is default
+
+// Square Race Mode Mappack Configuration
+[Setting category="Square Race Mode" name="Use Specific Mappack" description="Use a specific TMX mappack instead of random campaign maps"]
+bool useSpecificMappack = true;
+
+[Setting category="Square Race Mode" name="Mappack ID" description="TMX Mappack ID (e.g., 2823 for Training - Spring 2022)"]
+int squareRaceMappackId = 2823;  // Default: Training - Spring 2022
+
 // Styled button helper - applies theme colors to buttons
 bool StyledButton(const string &in label, const vec2 &in size = vec2(0, 0), bool isActive = false) {
     UI::PushStyleColor(UI::Col::Button, isActive ? themeActiveTabColor : themeInactiveTabColor);
@@ -88,6 +103,9 @@ bool StyledButton(const string &in label, const vec2 &in size = vec2(0, 0), bool
 
 // race variables
 uint64 raceStartedAt = 0;
+bool playerFinishedRace = false;
+int playerRaceTime = -1;
+bool playerDNF = false;
 
 void InitializeGlobals() {
     @board = array<array<Piece>>(8);

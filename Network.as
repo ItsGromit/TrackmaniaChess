@@ -48,12 +48,14 @@ namespace Network {
 
     class Lobby {
         string  id;
+        string  title = "";  // Display name for the lobby
         string  hostId;
         int     players;
         bool    open;
         bool    hasPassword;
         string  password;
         array<string> playerNames;
+        string  raceMode = "capture";  // "square" or "capture"
     }
     array<Lobby> lobbies;
 
@@ -124,26 +126,32 @@ namespace Network {
         SendJson(j);
     }
     // Create lobby
-    void CreateLobby(const string &in roomCode = "", const string &in password = "", const string &in playerName = "") {
+    void CreateLobby(const string &in roomTitle = "", const string &in password = "", const string &in playerName = "") {
         Json::Value j = Json::Object();
         j["type"] = "create_lobby";
 
-        // Generate random 5-letter room code if not provided
-        string code = roomCode;
-        if (code.Length == 0) {
-            const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-            for (uint i = 0; i < 5; i++) {
-                uint index = Math::Rand(0, chars.Length);
-                code += chars.SubStr(index, 1);
-            }
+        // Always generate random 5-letter room code
+        string code = "";
+        const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        for (uint i = 0; i < 5; i++) {
+            uint index = Math::Rand(0, chars.Length);
+            code += chars.SubStr(index, 1);
         }
 
         j["lobbyId"] = code;
+
+        // Add room title if provided
+        if (roomTitle.Length > 0) {
+            j["title"] = roomTitle;
+        }
+
         if (password.Length > 0) j["password"] = password;
         // Get local player name
         string name = playerName.Length > 0 ? playerName : GetLocalPlayerName();
         j["playerName"] = name;
-        print("[Chess] Creating lobby - RoomCode: " + code + ", HasPassword: " + (password.Length > 0 ? "yes" : "no") + ", Player: " + name);
+        // Send race mode selection
+        j["raceMode"] = currentRaceMode == RaceMode::SquareRace ? "square" : "capture";
+        print("[Chess] Creating lobby - RoomCode: " + code + ", Title: " + (roomTitle.Length > 0 ? roomTitle : "(none)") + ", HasPassword: " + (password.Length > 0 ? "yes" : "no") + ", Player: " + name + ", Mode: " + (currentRaceMode == RaceMode::SquareRace ? "Square Race" : "Capture Race"));
         SendJson(j);
     }
     // Join lobby
@@ -323,11 +331,13 @@ namespace Network {
                 Lobby l;
                 auto e = arr[i];
                 l.id          = string(e["id"]);
+                l.title       = e.HasKey("title") ? string(e["title"]) : "";
                 l.hostId      = string(e["hostId"]);
                 l.players     = int(e["players"]);
                 l.open        = bool(e["open"]);
                 l.hasPassword = bool(e["hasPassword"]);
                 l.password    = l.hasPassword ? "*" : "";
+                l.raceMode    = e.HasKey("raceMode") ? string(e["raceMode"]) : "capture";
                 l.playerNames.Resize(0);
                 if (e["playerNames"].GetType() != Json::Type::Null) {
                     for (uint j = 0; j < e["playerNames"].Length; j++) {
@@ -340,7 +350,7 @@ namespace Network {
         else if (t == "lobby_created") {
             currentLobbyId = string(msg["lobbyId"]);
             isHost = true;
-            print("[Chess Race] Lobby successfully created - LobbyId: " + currentLobbyId);
+            print("[Chess Race Classic] Lobby successfully created - LobbyId: " + currentLobbyId);
             GameManager::currentState = GameState::InLobby;
         }
         else if (t == "lobby_update") {
@@ -363,7 +373,14 @@ namespace Network {
             string fen  = string(msg["fen"]);
             string turn = string(msg["turn"]); // "w"/"b"
 
-            print("[Chess] Game starting - gameId: " + gameId + ", isWhite: " + isWhite + ", turn: " + turn);
+            // Receive race mode from server
+            if (msg.HasKey("raceMode")) {
+                string raceModeStr = string(msg["raceMode"]);
+                currentRaceMode = (raceModeStr == "square") ? RaceMode::SquareRace : RaceMode::CaptureRace;
+                print("[Chess] Game starting - gameId: " + gameId + ", isWhite: " + isWhite + ", turn: " + turn + ", mode: " + raceModeStr);
+            } else {
+                print("[Chess] Game starting - gameId: " + gameId + ", isWhite: " + isWhite + ", turn: " + turn);
+            }
 
             // Reset game state variables
             gameOver = false;
@@ -374,6 +391,12 @@ namespace Network {
 
             ApplyFEN(fen, turn);
             GameManager::currentState = GameState::Playing;
+
+            // Initialize new race mode if selected
+            if (currentRaceMode == RaceMode::SquareRace) {
+                startnew(NewRaceMode::InitializeAndAssignMaps);
+            }
+
             print("[Chess] Game state updated to Playing");
         } else if (t == "moved") {
             string fen  = string(msg["fen"]);
@@ -585,12 +608,159 @@ namespace Network {
         startnew(FetchTestRaceMap);
     }
 
+    // Coroutine to fetch a random campaign map for practice mode race challenges
+    // Preserves already-set captureFrom, captureTo, and isDefender values
+    void FetchPracticeModeRaceMap() {
+        print("[Chess] Fetching random campaign map for practice race...");
+
+        // Store the values that were already set by the dummy client
+        string savedCaptureFrom = captureFrom;
+        string savedCaptureTo = captureTo;
+        bool savedIsDefender = isDefender;
+
+        // Use MXRandom approach: fetch a random page to get variety
+        // Each page has up to 100 maps, use random offset for true randomness
+        int randomPage = Math::Rand(0, 10);  // 10 pages = up to 1000 maps pool
+        int pageSize = 100;
+
+        // Fetch from current campaign by searching for Nadeo maps with campaign tag
+        // Random order ensures we get different maps each time
+        string tmxUrl = "https://trackmania.exchange/mapsearch2/search?api=on&authorlogin=nadeo&tags=23&limit=" + pageSize + "&page=" + randomPage + "&random=1";
+
+        auto req = Net::HttpRequest();
+        req.Url = tmxUrl;
+        req.Method = Net::HttpMethod::Get;
+        req.Headers['User-Agent'] = "TrackmaniaChess/1.0 (Openplanet)";
+        req.Start();
+
+        // Wait for request to complete
+        while (!req.Finished()) {
+            yield();
+        }
+
+        int tmxId = -1;
+        string testMapName;
+
+        if (req.ResponseCode() == 200) {
+            // Parse response
+            auto response = Json::Parse(req.String());
+            if (response.GetType() == Json::Type::Object && response.HasKey("results")) {
+                auto results = response["results"];
+                if (results.Length > 0) {
+                    print("[Chess] TMX returned " + results.Length + " maps");
+
+                    // Filter maps using comprehensive criteria
+                    array<Json::Value@> validMaps;
+                    for (uint i = 0; i < results.Length; i++) {
+                        auto mapData = results[i];
+                        string mapName = mapData.HasKey("GbxMapName") ? string(mapData["GbxMapName"]) : string(mapData["Name"]);
+                        int awardCount = mapData.HasKey("AwardCount") ? int(mapData["AwardCount"]) : 0;
+
+                        // Strip Trackmania formatting codes ($ followed by 1-3 characters)
+                        string cleanName = mapName;
+                        while (cleanName.Contains("$")) {
+                            int dollarPos = cleanName.IndexOf("$");
+                            if (dollarPos >= 0 && dollarPos < int(cleanName.Length) - 1) {
+                                // Remove $ and up to 3 following characters
+                                int charsToRemove = Math::Min(4, int(cleanName.Length) - dollarPos);
+                                cleanName = cleanName.SubStr(0, dollarPos) + cleanName.SubStr(dollarPos + charsToRemove);
+                            } else {
+                                break;
+                            }
+                        }
+
+                        string lowerMapName = cleanName.ToLower();
+
+                        // Filter out low-quality/problematic maps
+                        bool shouldFilter = false;
+
+                        // Kacky and LOL maps
+                        if (lowerMapName.Contains("kacky") || lowerMapName.Contains("lol")) {
+                            shouldFilter = true;
+                        }
+
+                        // Low-effort maps with excessive awards (likely troll maps)
+                        if (awardCount > 15) {
+                            print("[Chess] Filtering out high award count map: " + cleanName + " (awards: " + awardCount + ")");
+                            shouldFilter = true;
+                        }
+
+                        // Common problematic keywords
+                        if (lowerMapName.Contains("impossible") || lowerMapName.Contains("trash") ||
+                            lowerMapName.Contains("awful") || lowerMapName.Contains("garbage") ||
+                            lowerMapName.Contains("rmc") || lowerMapName.Contains("rms") || lowerMapName.Contains("rmt")) {
+                            print("[Chess] Filtering out low-quality map: " + cleanName);
+                            shouldFilter = true;
+                        }
+
+                        if (shouldFilter) {
+                            continue;
+                        }
+
+                        validMaps.InsertLast(mapData);
+                    }
+
+                    if (validMaps.Length == 0) {
+                        // No valid maps in this batch, try a different random page
+                        print("[Chess] No valid maps on page " + randomPage + ", retrying with different page");
+                        startnew(FetchPracticeModeRaceMap);
+                        return;
+                    }
+
+                    print("[Chess] " + validMaps.Length + " valid maps found on page " + randomPage);
+
+                    // Pick a random map from the filtered list
+                    int randomIndex = Math::Rand(0, validMaps.Length);
+                    auto mapData = validMaps[randomIndex];
+
+                    tmxId = int(mapData["TrackID"]);
+                    testMapName = mapData.HasKey("GbxMapName") ? string(mapData["GbxMapName"]) : string(mapData["Name"]);
+
+                    print("[Chess] Selected campaign map: " + testMapName + " (TMX ID: " + tmxId + ")");
+                } else {
+                    print("[Chess] No campaign maps found, cannot start test race");
+                    UI::ShowNotification("Chess", "No campaign maps found", vec4(1,0.4,0.4,1), 4000);
+                    return;
+                }
+            } else {
+                print("[Chess] Invalid TMX response, cannot start test race");
+                UI::ShowNotification("Chess", "Invalid TMX response", vec4(1,0.4,0.4,1), 4000);
+                return;
+            }
+        } else {
+            print("[Chess] Failed to fetch from TMX (HTTP " + req.ResponseCode() + "), cannot start test race");
+            UI::ShowNotification("Chess", "Failed to fetch from TMX", vec4(1,0.4,0.4,1), 4000);
+            return;
+        }
+
+        // Simulate receiving a race_challenge message, preserving the actual move coordinates
+        raceMapName = testMapName;
+        captureFrom = savedCaptureFrom;
+        captureTo = savedCaptureTo;
+        isDefender = savedIsDefender;
+        defenderTime = -1;
+
+        // Reset race state
+        playerFinishedRace = false;
+        playerRaceTime = -1;
+        playerDNF = false;
+
+        print("[Chess] Practice Race - Map: " + raceMapName + ", Move: " + captureFrom + " to " + captureTo + ", You are: " + (isDefender ? "Defender" : "Attacker"));
+        GameManager::currentState = GameState::RaceChallenge;
+
+        raceStartedAt = Time::Now;
+
+        // Download and load the map from TMX
+        DownloadAndLoadMapFromTMX(tmxId, testMapName);
+    }
+
     // Coroutine to fetch a random campaign map for test race challenge
     void FetchTestRaceMap() {
         print("[Chess] Fetching random campaign map for test race...");
 
         // Fetch from current campaign by searching for Nadeo maps with campaign tag
-        string tmxUrl = "https://trackmania.exchange/mapsearch2/search?api=on&authorlogin=nadeo&tags=23&limit=25&order=TrackID&orderdir=DESC";
+        // Exclude Kacky (tag 37) and LOL (tag 29)
+        string tmxUrl = "https://trackmania.exchange/mapsearch2/search?api=on&authorlogin=nadeo&tags=23&etags=37,29&limit=25&order=TrackID&orderdir=DESC";
 
         auto req = Net::HttpRequest();
         req.Url = tmxUrl;
@@ -666,7 +836,8 @@ namespace Network {
         print("[Chess] Fetching random map from current campaign...");
 
         // Fetch from current campaign by searching for Nadeo maps with campaign tag
-        string tmxUrl = "https://trackmania.exchange/mapsearch2/search?api=on&authorlogin=nadeo&tags=23&limit=25&order=TrackID&orderdir=DESC";
+        // Exclude Kacky (tag 37) and LOL (tag 29)
+        string tmxUrl = "https://trackmania.exchange/mapsearch2/search?api=on&authorlogin=nadeo&tags=23&etags=37,29&limit=25&order=TrackID&orderdir=DESC";
 
         auto req = Net::HttpRequest();
         req.Url = tmxUrl;

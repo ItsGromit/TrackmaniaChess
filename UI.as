@@ -15,7 +15,7 @@ void MainMenu() {
     UI::PushStyleColor(UI::Col::TitleBgActive, bgColor);
     UI::PushStyleColor(UI::Col::TitleBgCollapsed, bgColor);
 
-    if (UI::Begin("Chess Race", showWindow, windowFlags)) {
+    if (UI::Begin("Chess Race Classic", showWindow, windowFlags)) {
 
         switch (GameManager::currentState) {
             case GameState::Menu: {
@@ -85,8 +85,44 @@ void MainMenu() {
                 // Tab content
                 if (currentMenuTab == MenuTab::Home) {
                     // Home tab - Rules and information
-                    UI::TextWrapped("Welcome to Chess Race! This is a competitive chess game where you can play against other players online.");
+                    UI::TextWrapped("Welcome to Chess Race Classic! This is a competitive chess game where you can play against other players online.");
                     UI::NewLine();
+
+                    // Practice Mode Section - Only show in developer mode
+                    if (developerMode) {
+                        UI::Text(themeSectionLabelColor + "Practice Mode (Developer):");
+                        UI::NewLine();
+                        UI::TextWrapped("Play against a simple AI opponent to test the full game including racing challenges. You will be randomly assigned white or black.");
+                        UI::NewLine();
+
+                        // Race mode selection for practice
+                        if (UI::RadioButton("Square Race##practice", currentRaceMode == RaceMode::SquareRace)) {
+                            currentRaceMode = RaceMode::SquareRace;
+                        }
+                        if (UI::RadioButton("Capture Race (Classic)##practice", currentRaceMode == RaceMode::CaptureRace)) {
+                            currentRaceMode = RaceMode::CaptureRace;
+                        }
+                        UI::NewLine();
+
+                        if (StyledButton("Start Practice Game", vec2(200.0f, 30.0f))) {
+                            InitializeGlobals();
+                            ApplyFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", "w");
+                            GameManager::currentState = GameState::Playing;
+
+                            // Initialize new race mode if selected
+                            if (currentRaceMode == RaceMode::SquareRace) {
+                                startnew(NewRaceMode::InitializeAndAssignMaps);
+                            }
+
+                            // Randomly assign colors (like the server does)
+                            bool dummyPlaysWhite = (Math::Rand(0, 2) == 0);
+                            DummyClient::StartGame(dummyPlaysWhite);
+                        }
+
+                        UI::NewLine();
+                        UI::NewLine();
+                    }
+
                     UI::Text("\\$f80Rules:");
                     UI::TextWrapped("- Play follows standard chess rules");
                     UI::TextWrapped("To do");
@@ -114,11 +150,16 @@ void MainMenu() {
                         }
                     }
 
-                    // Render create lobby UI
-                    Lobby::RenderCreateLobby();
+                    // Show create lobby page or lobby list
+                    if (Lobby::isCreatingLobby) {
+                        Lobby::RenderCreateLobbyPage();
+                    } else {
+                        // Render create lobby UI
+                        Lobby::RenderCreateLobby();
 
-                    // Show lobby list
-                    Lobby::RenderLobbyList();
+                        // Show lobby list
+                        Lobby::RenderLobbyList();
+                    }
 
                 } else if (currentMenuTab == MenuTab::Settings) {
                     // Settings tab
@@ -127,7 +168,7 @@ void MainMenu() {
 
                     // Window resize toggle
                     string settingsButtonText = windowResizeable ? "Lock Window Size" : "Unlock Window Size";
-                    UI::Text(settingsLockText);
+                    UI::Text("Allow the window to be resized:");
                     if (StyledButton(settingsButtonText, vec2(150.0f, 0))) {
                         windowResizeable = !windowResizeable;
                     }
@@ -140,10 +181,9 @@ void MainMenu() {
                     if (StyledButton("Customize Colors", vec2(200.0f, 30.0f))) {
                         showColorCustomizationWindow = true;
                     }
+                    UI::TextWrapped("Open the color customization window to change button and board colors.");
 
-                    // Developer Mode Section - Disabled for release
-                    // Uncomment to enable developer mode for testing
-                    /*
+                    // Developer Mode Section
                     UI::NewLine();
                     UI::NewLine();
 
@@ -153,25 +193,15 @@ void MainMenu() {
                     developerMode = UI::Checkbox("Enable Developer Mode", developerMode);
                     if (UI::IsItemHovered()) {
                         UI::BeginTooltip();
-                        UI::Text("Enables testing features without needing another player");
+                        UI::Text("Enables testing features including practice mode with AI");
                         UI::EndTooltip();
                     }
 
                     if (developerMode) {
                         UI::NewLine();
                         UI::Text(themeWarningTextColor + "Developer Mode Active");
-                        UI::NewLine();
-
-                        if (UI::Button("Test Race Challenge", vec2(200.0f, 0))) {
-                            Network::TestRaceChallenge();
-                        }
-                        if (UI::IsItemHovered()) {
-                            UI::BeginTooltip();
-                            UI::Text("Simulate a race challenge with a random campaign map");
-                            UI::EndTooltip();
-                        }
+                        UI::TextWrapped("Practice mode is now available in the Home tab.");
                     }
-                    */
                 }
 
                 break;
@@ -249,14 +279,20 @@ void MainMenu() {
 
                 UI::NewLine();
 
-                // Render create lobby UI
-                Lobby::RenderCreateLobby();
+                // Show create lobby page or lobby list
+                if (Lobby::isCreatingLobby) {
+                    Lobby::RenderCreateLobbyPage();
+                } else {
+                    // Render create lobby UI
+                    Lobby::RenderCreateLobby();
 
-                // Show lobby list
-                Lobby::RenderLobbyList();
+                    // Show lobby list
+                    Lobby::RenderLobbyList();
+                }
 
                 if (StyledButton("Back to Menu")) {
                     GameManager::currentState = GameState::Menu;
+                    Lobby::isCreatingLobby = false;  // Reset state when going back
                 }
                 break;
             }
@@ -390,47 +426,74 @@ void MainMenu() {
             }
             UI::EndChild();
 
-            // Forfeit button below move history, aligned with it
+            // Forfeit/Back to Menu button below move history, aligned with it
             if (GameManager::currentState == GameState::Playing && !gameOver) {
                 vec2 buttonCursor = UI::GetCursorPos();
                 UI::SetCursorPos(vec2(buttonCursor.x, buttonCursor.y + 30.0f));
-                if (StyledButton("Forfeit", vec2(moveHistoryWidth, belowBoardUIHeight))) {
-                    Network::Resign();
+
+                if (DummyClient::enabled) {
+                    // Dummy client mode - show back to menu button
+                    if (StyledButton("Back to Menu", vec2(moveHistoryWidth, belowBoardUIHeight))) {
+                        DummyClient::StopGame();
+                        GameManager::currentState = GameState::Menu;
+                    }
+                } else {
+                    // Network game - show forfeit button
+                    if (StyledButton("Forfeit", vec2(moveHistoryWidth, belowBoardUIHeight))) {
+                        Network::Resign();
+                    }
                 }
             }
             if (GameManager::currentState == GameState::GameOver) {
                 vec2 buttonCursor = UI::GetCursorPos();
                 UI::SetCursorPos(vec2(buttonCursor.x, buttonCursor.y - 5.0f));
 
-                // Show different UI based on rematch state
-                if (rematchRequestReceived) {
-                    // Opponent requested rematch - show accept/decline buttons
-                    UI::Text(themeSuccessTextColor + "Opponent wants a rematch!");
-                    if (StyledButton("Accept Rematch", vec2(moveHistoryWidth, belowBoardUIHeight))) {
-                        Network::RespondToRematch(true);
+                // Check if playing against dummy client
+                if (DummyClient::enabled) {
+                    // Dummy client mode - show simple play again button
+                    if (StyledButton("Play Again", vec2(moveHistoryWidth, belowBoardUIHeight))) {
+                        bool dummyPlaysWhite = DummyClient::isMyTurn; // If it's dummy's turn now, dummy was white
+                        InitializeGlobals();
+                        ApplyFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", "w");
+                        GameManager::currentState = GameState::Playing;
+                        DummyClient::StartGame(dummyPlaysWhite);
                     }
-                    if (StyledButton("Decline", vec2(moveHistoryWidth, belowBoardUIHeight))) {
-                        Network::RespondToRematch(false);
-                    }
-                } else if (rematchRequestSent) {
-                    // Waiting for opponent to respond
-                    UI::Text(themeWarningTextColor + "Waiting for opponent...");
-                    if (StyledButton("Cancel Request", vec2(moveHistoryWidth, belowBoardUIHeight))) {
-                        rematchRequestSent = false;
-                        UI::ShowNotification("Chess", "Rematch request cancelled", vec4(0.8,0.8,0.2,1), 3000);
+
+                    if (StyledButton("Back to Menu", vec2(moveHistoryWidth, belowBoardUIHeight))) {
+                        DummyClient::StopGame();
+                        GameManager::currentState = GameState::Menu;
                     }
                 } else {
-                    // Normal state - show rematch button
-                    if (StyledButton("Request Rematch", vec2(moveHistoryWidth, belowBoardUIHeight))) {
-                        Network::RequestNewGame();
+                    // Network game - show rematch UI based on rematch state
+                    if (rematchRequestReceived) {
+                        // Opponent requested rematch - show accept/decline buttons
+                        UI::Text(themeSuccessTextColor + "Opponent wants a rematch!");
+                        if (StyledButton("Accept Rematch", vec2(moveHistoryWidth, belowBoardUIHeight))) {
+                            Network::RespondToRematch(true);
+                        }
+                        if (StyledButton("Decline", vec2(moveHistoryWidth, belowBoardUIHeight))) {
+                            Network::RespondToRematch(false);
+                        }
+                    } else if (rematchRequestSent) {
+                        // Waiting for opponent to respond
+                        UI::Text(themeWarningTextColor + "Waiting for opponent...");
+                        if (StyledButton("Cancel Request", vec2(moveHistoryWidth, belowBoardUIHeight))) {
+                            rematchRequestSent = false;
+                            UI::ShowNotification("Chess", "Rematch request cancelled", vec4(0.8,0.8,0.2,1), 3000);
+                        }
+                    } else {
+                        // Normal state - show rematch button
+                        if (StyledButton("Request Rematch", vec2(moveHistoryWidth, belowBoardUIHeight))) {
+                            Network::RequestNewGame();
+                        }
                     }
-                }
 
-                if (StyledButton("Back to menu", vec2(moveHistoryWidth, belowBoardUIHeight))) {
-                    Network::LeaveLobby();
-                    GameManager::currentState = GameState::Menu;
-                    rematchRequestReceived = false;
-                    rematchRequestSent = false;
+                    if (StyledButton("Back to menu", vec2(moveHistoryWidth, belowBoardUIHeight))) {
+                        Network::LeaveLobby();
+                        GameManager::currentState = GameState::Menu;
+                        rematchRequestReceived = false;
+                        rematchRequestSent = false;
+                    }
                 }
             }
             UI::EndGroup();
@@ -444,6 +507,9 @@ void MainMenu() {
 
     // Pop the title bar style colors
     UI::PopStyleColor(3);
+
+    // Render map filters popup window (independent of main window)
+    Lobby::RenderMapFiltersWindow();
 }
 
 void BoardRender() {
@@ -638,10 +704,22 @@ void HandleSquareClick(int row, int col) {
         selectedRow = selectedCol = -1;
 
         if (IsValidMove(fr, fc, row, col)) {
-            Piece moved = board[fr][fc];
-            board[row][col] = moved;
+            // Check if move would result in check
+            Piece temp = board[row][col];
+            board[row][col] = board[fr][fc];
             board[fr][fc] = Piece();
-            currentTurn = (currentTurn == PieceColor::White) ? PieceColor::Black : PieceColor::White;
+
+            bool wouldBeInCheck = IsInCheck(PieceColor(currentTurn));
+
+            board[fr][fc] = board[row][col];
+            board[row][col] = temp;
+
+            if (wouldBeInCheck) {
+                return; // Invalid move - would put own king in check
+            }
+
+            // Execute the player's move
+            DummyClient::ExecutePlayerMove(fr, fc, row, col);
         }
         return;
     }

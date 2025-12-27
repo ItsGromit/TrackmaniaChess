@@ -34,11 +34,13 @@ function lobbyList() {
   for (const [id, l] of lobbies.entries()) {
     list.push({
       id,
+      title: l.title || "",  // Include title in lobby list
       hostId: l.host.id,
       players: l.players.length,
       open: l.open,
       hasPassword: !!l.password,
-      playerNames: l.playerNames
+      playerNames: l.playerNames,
+      raceMode: l.raceMode || "capture"  // Include race mode
     });
   }
   return list;
