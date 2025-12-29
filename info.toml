@@ -1,9 +1,6 @@
 [meta]
-name = "Chess Race Classic"
+name = "Chess Race"
 author = "ItsGromit"
 category = "Game"
 version = "0.9"
 siteid = ""
-
-[package]
-files = ["assets/**"]
