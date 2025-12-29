@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(del ASSET_SERVER.md RAILWAY_SETUP.md)"
     ]
   }
 }
