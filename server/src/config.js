@@ -12,7 +12,8 @@ const BLACKLISTED_MAPPACKS = [
 ];
 
 // Server configuration
-const TCP_PORT = Number(process.env.PORT || 29802);
+// Use GAME_PORT for TCP server, PORT is reserved for HTTP (Railway requirement)
+const TCP_PORT = Number(process.env.GAME_PORT || 29802);
 
 // Stats logging interval (ms)
 const STATS_INTERVAL = 50000;

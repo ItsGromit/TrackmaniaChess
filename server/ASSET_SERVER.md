@@ -4,9 +4,9 @@ This server provides both TCP game logic and HTTP asset hosting for the Trackman
 
 ## What's Included
 
-The server now runs two services:
-1. **TCP Server** (port from `PORT` env var, default 29802) - Game logic and multiplayer
-2. **HTTP Server** (port from `HTTP_PORT` env var, default 3000) - Static asset hosting
+The server now runs two services simultaneously:
+1. **HTTP Server** (port from `PORT` env var, default 3000) - Static asset hosting
+2. **TCP Server** (port from `GAME_PORT` env var, default 29802) - Game logic and multiplayer
 
 ## Asset Files
 
@@ -40,8 +40,8 @@ npm start
 ```
 
 The server will start:
-- TCP server on port 29802 (or `PORT` env var)
-- HTTP server on port 3000 (or `HTTP_PORT` env var)
+- HTTP server on port 3000 (or `PORT` env var for Railway)
+- TCP server on port 29802 (or `GAME_PORT` env var)
 
 Assets will be available at: `http://localhost:3000/assets/`
 
@@ -49,16 +49,22 @@ Assets will be available at: `http://localhost:3000/assets/`
 
 Railway will automatically:
 1. Build the Docker container (including the `/assets` folder)
-2. Expose port 8080 (Railway's standard)
-3. Set the `PORT` environment variable
+2. Set the `PORT` environment variable (Railway auto-assigns this)
+3. Route HTTP traffic to your app on that port
 
-**Important**: You need to configure Railway environment variables:
+**Important Railway Configuration**:
 
-In your Railway project settings, add:
-- `PORT` - The port for TCP server (Railway will auto-set this, usually to match the exposed port)
-- `HTTP_PORT` - Set this to `8080` or whatever port Railway exposes
+The server uses:
+- **`PORT`** - For HTTP asset server (Railway sets this automatically, usually 8080 or similar)
+- **`GAME_PORT`** - For TCP game server (you need to set this manually in Railway)
 
-Since Railway routes external traffic to port 8080, you should configure your server to use port 8080 for the HTTP server by setting `HTTP_PORT=8080` in Railway.
+**In your Railway project settings**, you should add:
+- `GAME_PORT` - Set to `29802` (or whatever port you want for TCP connections)
+
+Railway's `PORT` variable is automatically used by the HTTP server, so assets will be accessible at:
+`https://trackmaniachess.up.railway.app/assets/`
+
+**Note**: Railway may need TCP proxy configuration for the game server to work. Check Railway's TCP proxy documentation if TCP connections aren't working.
 
 ### 4. Update Plugin Configuration
 
@@ -100,9 +106,9 @@ This means assets are only downloaded once per user, then cached permanently.
 
 **Assets not loading?**
 - Check that Railway app is running
-- Verify `HTTP_PORT` environment variable is set correctly in Railway
 - Test the health endpoint: `https://trackmaniachess.up.railway.app/health`
-- Check Railway logs for HTTP server startup message
+- Check Railway logs for "HTTP asset server listening on port X" message
+- Verify assets are included in Docker build (check Dockerfile has `COPY /assets ./assets`)
 
 **CORS errors?**
 - The server includes CORS middleware to allow requests from any origin
