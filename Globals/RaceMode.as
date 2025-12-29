@@ -6,9 +6,9 @@ enum RaceMode {
 
 RaceMode currentRaceMode = RaceMode::SquareRace;
 
-// Square Race Mode Mappack Configuration
-[Setting category="Square Race Mode" name="Use Specific Mappack" description="Use a specific TMX mappack instead of random campaign maps"]
+// Chess Race Mode Mappack Configuration
+[Setting category="Chess Race Mode" name="Use Specific Mappack" description="Use a specific TMX mappack instead of random campaign maps"]
 bool useSpecificMappack = true;
 
-[Setting category="Square Race Mode" name="Mappack ID" description="TMX Mappack ID (e.g., 2823 for Training - Spring 2022)"]
-int squareRaceMappackId = 2823;
+[Setting category="Chess Race Mode" name="Mappack ID" description="TMX Mappack ID (e.g., 7237 for Chess Race)"]
+int squareRaceMappackId = 7237;

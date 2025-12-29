@@ -77,11 +77,16 @@ void RenderHomeTab() {
         UI::NewLine();
 
         // Race mode selection for practice
-        if (UI::RadioButton("Square Race##practice", currentRaceMode == RaceMode::SquareRace)) {
-            currentRaceMode = RaceMode::SquareRace;
-        }
-        if (UI::RadioButton("Capture Race (Classic)##practice", currentRaceMode == RaceMode::CaptureRace)) {
-            currentRaceMode = RaceMode::CaptureRace;
+        UI::Text("Game Mode:");
+        UI::SetNextItemWidth(200);
+        if (UI::BeginCombo("##practicemode", currentRaceMode == RaceMode::SquareRace ? "Chess Race" : "Capture Race (Classic)")) {
+            if (UI::Selectable("Chess Race", currentRaceMode == RaceMode::SquareRace)) {
+                currentRaceMode = RaceMode::SquareRace;
+            }
+            if (UI::Selectable("Capture Race (Classic)", currentRaceMode == RaceMode::CaptureRace)) {
+                currentRaceMode = RaceMode::CaptureRace;
+            }
+            UI::EndCombo();
         }
         UI::NewLine();
 

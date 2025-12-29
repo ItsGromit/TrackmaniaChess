@@ -18,7 +18,9 @@ void CreateLobby(const string &in roomTitle = "", const string &in password = ""
     string name = playerName.Length > 0 ? playerName : GetLocalPlayerName();
     j["playerName"] = name;
     // Send race mode selection
-    j["raceMode"] = currentRaceMode == RaceMode::SquareRace ? "square" : "capture";
-    print("[Chess] Creating lobby - RoomCode: " + code + ", Title: " + (roomTitle.Length > 0 ? roomTitle : "(none)") + ", HasPassword: " + (password.Length > 0 ? "yes" : "no") + ", Player: " + name + ", Mode: " + (currentRaceMode == RaceMode::SquareRace ? "Square Race" : "Capture Race"));
+    string raceMode = currentRaceMode == RaceMode::SquareRace ? "square" : "capture";
+    j["raceMode"] = raceMode;
+    currentLobbyRaceMode = raceMode; // Store locally
+    print("[Chess] Creating lobby - RoomCode: " + code + ", Title: " + (roomTitle.Length > 0 ? roomTitle : "(none)") + ", HasPassword: " + (password.Length > 0 ? "yes" : "no") + ", Player: " + name + ", Mode: " + (currentRaceMode == RaceMode::SquareRace ? "Chess Race" : "Capture Race"));
     SendJson(j);
 }

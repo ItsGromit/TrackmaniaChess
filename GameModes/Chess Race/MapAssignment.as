@@ -46,12 +46,18 @@ bool AssignMapToSquare(int row, int col, int tmxId, const string &in mapName,
 /**
  * Assigns maps from a specific mappack to all 64 board squares
  *
- * @param mappackId The TMX mappack ID to use (e.g., 2823 for Training - Spring 2022)
+ * @param mappackId The TMX mappack ID to use (e.g., 7237 for Chess Race)
  */
 void AssignMapsFromMappack(int mappackId) {
     print("[ChessRace::MapAssignment] Assigning maps from mappack " + mappackId + "...");
 
-    string tmxUrl = "https://trackmania.exchange/api/mappack/get_mappack_tracks/" + mappackId;
+    // Use special secret URL for the default private mappack
+    string tmxUrl;
+    if (mappackId == 7237) {
+        tmxUrl = "https://trackmania.exchange/api/mappack/get_mappack_tracks/7237/q8ZmmD9jrkGZ1Nf98BN3Sw";
+    } else {
+        tmxUrl = "https://trackmania.exchange/api/mappack/get_mappack_tracks/" + mappackId;
+    }
 
     auto req = Net::HttpRequest();
     req.Url = tmxUrl;
@@ -63,29 +69,48 @@ void AssignMapsFromMappack(int mappackId) {
 
     if (req.ResponseCode() != 200) {
         print("[ChessRace::MapAssignment] Failed to fetch mappack from TMX: HTTP " + req.ResponseCode());
-        print("[ChessRace::MapAssignment] Falling back to random campaign maps");
-        AssignRandomMapsToBoard();
+        // Always fall back to default mappack
+        if (mappackId != 7237) {
+            print("[ChessRace::MapAssignment] Falling back to default mappack (7237)");
+            AssignMapsFromMappack(7237);
+        } else {
+            print("[ChessRace::MapAssignment] ERROR: Default mappack failed! Cannot continue.");
+        }
         return;
     }
 
     auto json = Json::Parse(req.String());
     if (json.GetType() != Json::Type::Array) {
         print("[ChessRace::MapAssignment] Invalid mappack response format");
-        print("[ChessRace::MapAssignment] Falling back to random campaign maps");
-        AssignRandomMapsToBoard();
+        // Always fall back to default mappack
+        if (mappackId != 7237) {
+            print("[ChessRace::MapAssignment] Falling back to default mappack (7237)");
+            AssignMapsFromMappack(7237);
+        } else {
+            print("[ChessRace::MapAssignment] ERROR: Default mappack invalid! Cannot continue.");
+        }
         return;
     }
 
     print("[ChessRace::MapAssignment] Mappack contains " + json.Length + " maps");
 
+    // Check if mappack is empty and fall back to default
+    if (json.Length == 0) {
+        print("[ChessRace::MapAssignment] Mappack is empty!");
+        // Always fall back to default mappack
+        if (mappackId != 7237) {
+            print("[ChessRace::MapAssignment] Falling back to default mappack (7237)");
+            AssignMapsFromMappack(7237);
+        } else {
+            print("[ChessRace::MapAssignment] ERROR: Default mappack is empty! Cannot continue.");
+        }
+        return;
+    }
+
     // Assign maps to squares (loop through mappack, wrapping if needed)
     int mapIndex = 0;
     for (int row = 0; row < 8; row++) {
         for (int col = 0; col < 8; col++) {
-            if (json.Length == 0) {
-                print("[ChessRace::MapAssignment] Mappack is empty!");
-                return;
-            }
 
             // Wrap around if mappack has fewer than 64 maps
             auto mapObj = json[mapIndex % json.Length];

@@ -9,6 +9,8 @@ bool isConnected = false;
 string playerId;
 string currentLobbyId;
 string currentLobbyPassword;
+string currentLobbyRaceMode = "capture"; // Track the current lobby's race mode
+array<string> currentLobbyPlayerNames; // Track players in current lobby
 string gameId;
 bool isWhite = false;
 bool isHost = false;

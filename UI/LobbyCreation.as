@@ -24,7 +24,7 @@ string JoinStrings(const array<string> &in arr, const string &in separator) {
 bool isCreatingLobby = false;
 string newLobbyTitle = "";
 string newLobbyPassword = "";
-string newLobbyRaceMode = "capture"; // "capture" or "square"
+string newLobbyRaceMode = "square"; // "capture" or "square" - default is Chess Race
 
 // Map filters window state
 bool showMapFiltersWindow = false;
@@ -89,9 +89,9 @@ void RenderLobbyList() {
 void RenderCreateLobby() {
     if (StyledButton("+ Create Lobby", vec2(150.0f, 30.0f))) {
         isCreatingLobby = true;
-        newLobbyTitle = "";
+        newLobbyTitle = GetLocalPlayerName() + "'s Chess Lobby";
         newLobbyPassword = "";
-        newLobbyRaceMode = "capture";
+        newLobbyRaceMode = "square";
     }
 }
 
@@ -109,48 +109,38 @@ void RenderCreateLobbyPage() {
     UI::NewLine();
 
     UI::Text("Game Mode:");
-    if (UI::RadioButton("Capture Race (Classic)", newLobbyRaceMode == "capture")) {
-        newLobbyRaceMode = "capture";
-    }
-    UI::SameLine();
-    if (UI::RadioButton("Square Race", newLobbyRaceMode == "square")) {
-        newLobbyRaceMode = "square";
+    UI::SetNextItemWidth(200);
+    if (UI::BeginCombo("##gamemode", newLobbyRaceMode == "square" ? "Chess Race" : "Capture Race (Classic)")) {
+        if (UI::Selectable("Chess Race", newLobbyRaceMode == "square")) {
+            newLobbyRaceMode = "square";
+        }
+        if (UI::Selectable("Capture Race (Classic)", newLobbyRaceMode == "capture")) {
+            newLobbyRaceMode = "capture";
+        }
+        UI::EndCombo();
     }
 
-    UI::NewLine();
-
-    // Square Race Mode Settings - only show for Square Race
+    // Chess Race Mode Settings - show inline if Chess Race is selected
     if (newLobbyRaceMode == "square") {
-        UI::Text(themeSectionLabelColor + "Square Race Settings:");
-        UI::NewLine();
-
-        useSpecificMappack = UI::Checkbox("Use Specific Mappack", useSpecificMappack);
+        UI::SameLine();
+        UI::Text(" | Mappack:");
+        UI::SameLine();
+        UI::SetNextItemWidth(100);
+        string mappackIdStr = "" + squareRaceMappackId;
+        mappackIdStr = UI::InputText("##mappackid", mappackIdStr, UI::InputTextFlags::CharsDecimal);
+        int parsedId = Text::ParseInt(mappackIdStr);
+        if (parsedId > 0) squareRaceMappackId = parsedId;
+        if (squareRaceMappackId < 1) squareRaceMappackId = 1;
         if (UI::IsItemHovered()) {
             UI::BeginTooltip();
             UI::PushTextWrapPos(250.0f);
-            UI::Text("Use a specific TMX mappack instead of random campaign maps.");
+            UI::Text("TMX Mappack ID (default: 7237 for Chess Race). Find mappack IDs at trackmania.exchange");
             UI::PopTextWrapPos();
             UI::EndTooltip();
         }
-
-        if (useSpecificMappack) {
-            UI::Text("Mappack ID:");
-            UI::SameLine();
-            UI::SetNextItemWidth(150);
-            squareRaceMappackId = UI::InputInt("##mappackid", squareRaceMappackId);
-            if (squareRaceMappackId < 1) squareRaceMappackId = 1;
-
-            if (UI::IsItemHovered()) {
-                UI::BeginTooltip();
-                UI::PushTextWrapPos(250.0f);
-                UI::Text("TMX Mappack ID (e.g., 2823 for Training - Spring 2022). Find mappack IDs at trackmania.exchange");
-                UI::PopTextWrapPos();
-                UI::EndTooltip();
-            }
-        }
-
-        UI::NewLine();
     }
+
+    UI::NewLine();
 
     UI::Text("Password (optional):");
     UI::SetNextItemWidth(200);
@@ -185,9 +175,20 @@ void RenderCurrentLobby() {
     UI::Separator();
 
     // Show players in lobby
-    UI::Text("Players:");
-    // TODO: Display actual player list from lobby state
-    UI::TextDisabled("Waiting for game to start...");
+    UI::Text("Players (" + currentLobbyPlayerNames.Length + "/2):");
+    if (currentLobbyPlayerNames.Length > 0) {
+        for (uint i = 0; i < currentLobbyPlayerNames.Length; i++) {
+            string playerName = currentLobbyPlayerNames[i];
+            // Mark the host
+            if (i == 0) {
+                UI::Text("  \\$0f0" + playerName + " (Host)");
+            } else {
+                UI::Text("  " + playerName);
+            }
+        }
+    } else {
+        UI::TextDisabled("  No players");
+    }
 
     UI::NewLine();
 
@@ -199,10 +200,13 @@ void RenderCurrentLobby() {
             StartGame();
         }
 
-        UI::SameLine();
+        // Only show Map Filters button for Capture Race mode
+        if (currentLobbyRaceMode == "capture") {
+            UI::SameLine();
 
-        if (StyledButton("Map Filters", vec2(150.0f, 30.0f))) {
-            showMapFiltersWindow = true;
+            if (StyledButton("Map Filters", vec2(150.0f, 30.0f))) {
+                showMapFiltersWindow = true;
+            }
         }
     } else {
         UI::TextDisabled("Waiting for host to start...");

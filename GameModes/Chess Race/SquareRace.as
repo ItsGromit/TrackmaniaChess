@@ -1,7 +1,7 @@
 // ============================================================================
-// SQUARE RACE MODE
+// CHESS RACE MODE
 // ============================================================================
-// In Square Race mode:
+// In Chess Race mode:
 // - Each of the 64 chess board squares is assigned a specific Trackmania map
 // - Map thumbnails are displayed on each square
 // - Players race ONLY when a capture is attempted (attacker vs defender)
@@ -22,10 +22,10 @@ bool isRacingSquareMode = false;
 // ============================================================================
 
 /**
- * Initializes the Square Race mode system
+ * Initializes the Chess Race mode system
  */
 void InitializeChessRace() {
-    print("[ChessRace] Initializing Square Race mode...");
+    print("[ChessRace] Initializing Chess Race mode...");
 
     MapAssignment::InitializeBoardMaps();
     OpponentTracking::ResetOpponentData();

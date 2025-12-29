@@ -3,15 +3,6 @@
 // ============================================================================
 // Main UI entry point that coordinates all UI components
 // ============================================================================
-
-/**
- * Openplanet plugin entry point - called every frame
- * This is the function Openplanet looks for to render the plugin UI
- */
-void Render() {
-    MainMenu();
-}
-
 /**
  * Main menu rendering function - called every frame
  * Handles the main window and delegates to specific state renderers

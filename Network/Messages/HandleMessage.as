@@ -35,6 +35,13 @@
         else if (t == "lobby_created") {
             currentLobbyId = string(msg["lobbyId"]);
             isHost = true;
+            // Store the lobby's race mode
+            if (msg.HasKey("raceMode")) {
+                currentLobbyRaceMode = string(msg["raceMode"]);
+            }
+            // Initialize player names array (creator is the only player initially)
+            currentLobbyPlayerNames.Resize(0);
+            currentLobbyPlayerNames.InsertLast(GetLocalPlayerName());
             print("[Chess Race Classic] Lobby successfully created - LobbyId: " + currentLobbyId);
             GameManager::currentState = GameState::InLobby;
         }
@@ -44,11 +51,24 @@
                 currentLobbyId = id;
                 string host = string(msg["hostId"]);
                 isHost = (host == playerId);
+                // Store the lobby's race mode
+                if (msg.HasKey("raceMode")) {
+                    currentLobbyRaceMode = string(msg["raceMode"]);
+                }
+                // Store player names
+                currentLobbyPlayerNames.Resize(0);
+                if (msg.HasKey("playerNames") && msg["playerNames"].GetType() != Json::Type::Null) {
+                    for (uint j = 0; j < msg["playerNames"].Length; j++) {
+                        currentLobbyPlayerNames.InsertLast(string(msg["playerNames"][j]));
+                    }
+                }
                 // Transition to InLobby state when joining
                 if (currentLobbyId.Length > 0 && GameManager::currentState == GameState::InQueue) {
                     GameManager::currentState = GameState::InLobby;
-                    // Request current map filters when joining lobby
-                    GetMapFilters(currentLobbyId);
+                    // Request current map filters when joining lobby (only for Capture Race mode)
+                    if (currentLobbyRaceMode == "capture") {
+                        GetMapFilters(currentLobbyId);
+                    }
                 }
             }
         }

@@ -24,7 +24,7 @@ void FetchSquareRaceMapWrapper() {
 
 /**
  * Loads the map assigned to a specific square for a capture race
- * This is called when a capture move is attempted in Square Race mode
+ * This is called when a capture move is attempted in Chess Race mode
  *
  * IMPORTANT: Races only happen on capture attempts (attacker vs defender).
  * The map loaded is the one assigned to the destination square (where the capture would occur).
