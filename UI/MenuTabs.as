@@ -88,6 +88,26 @@ void RenderHomeTab() {
             }
             UI::EndCombo();
         }
+
+        // Chess Race Mode Settings - show inline if Chess Race is selected
+        if (currentRaceMode == RaceMode::SquareRace) {
+            UI::SameLine();
+            UI::Text(" | Mappack:");
+            UI::SameLine();
+            UI::SetNextItemWidth(100);
+            string mappackIdStr = "" + squareRaceMappackId;
+            mappackIdStr = UI::InputText("##practicemappackid", mappackIdStr, UI::InputTextFlags::CharsDecimal);
+            int parsedId = Text::ParseInt(mappackIdStr);
+            if (parsedId > 0) squareRaceMappackId = parsedId;
+            if (squareRaceMappackId < 1) squareRaceMappackId = 1;
+            if (UI::IsItemHovered()) {
+                UI::BeginTooltip();
+                UI::PushTextWrapPos(250.0f);
+                UI::Text("TMX Mappack ID (default: 7237 for Chess Race). Find mappack IDs at trackmania.exchange");
+                UI::PopTextWrapPos();
+                UI::EndTooltip();
+            }
+        }
         UI::NewLine();
 
         if (StyledButton("Start Practice Game", vec2(200.0f, 30.0f))) {
@@ -97,7 +117,9 @@ void RenderHomeTab() {
 
             // Initialize new race mode if selected
             if (currentRaceMode == RaceMode::SquareRace) {
-                startnew(RaceMode::MapAssignment::InitializeBoardMaps);
+                // For practice mode, use the local mappack setting
+                activeMappackId = squareRaceMappackId;
+                startnew(RaceMode::InitializeAndAssignMaps);
             }
 
             // Randomly assign colors (like the server does)

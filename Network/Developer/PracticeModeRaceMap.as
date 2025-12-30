@@ -105,13 +105,13 @@ void FetchPracticeModeRaceMap() {
     captureTo = savedCaptureTo;
     isDefender = savedIsDefender;
     defenderTime = -1;
-    // Reset race state
+    // Reset race state - timer will start when map loads
     playerFinishedRace = false;
     playerRaceTime = -1;
     playerDNF = false;
+    raceStartedAt = 0;
     print("[Chess] Practice Race - Map: " + raceMapName + ", Move: " + captureFrom + " to " + captureTo + ", You are: " + (isDefender ? "Defender" : "Attacker"));
     GameManager::currentState = GameState::RaceChallenge;
-    raceStartedAt = Time::Now;
     // Download and load the map from TMX
     DownloadAndLoadMapFromTMX(tmxId, testMapName);
 }

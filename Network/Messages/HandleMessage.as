@@ -82,7 +82,14 @@
             if (msg.HasKey("raceMode")) {
                 string raceModeStr = string(msg["raceMode"]);
                 currentRaceMode = (raceModeStr == "square") ? RaceMode::SquareRace : RaceMode::CaptureRace;
-                print("[Chess] Game starting - gameId: " + gameId + ", isWhite: " + isWhite + ", turn: " + turn + ", mode: " + raceModeStr);
+
+                // Receive mappack ID for Chess Race mode
+                if (msg.HasKey("mappackId")) {
+                    activeMappackId = int(msg["mappackId"]);
+                    print("[Chess] Game starting - gameId: " + gameId + ", isWhite: " + isWhite + ", turn: " + turn + ", mode: " + raceModeStr + ", mappack: " + activeMappackId);
+                } else {
+                    print("[Chess] Game starting - gameId: " + gameId + ", isWhite: " + isWhite + ", turn: " + turn + ", mode: " + raceModeStr);
+                }
             } else {
                 print("[Chess] Game starting - gameId: " + gameId + ", isWhite: " + isWhite + ", turn: " + turn);
             }
@@ -140,8 +147,15 @@
             print("[Chess] Race challenge started - Map: " + raceMapName + " (TMX ID: " + raceMapTmxId + "), You are: " + (isDefender ? "Defender" : "Attacker"));
             GameManager::currentState = GameState::RaceChallenge;
 
-            // Reset race state in main.as via external variable
-            raceStartedAt = Time::Now;
+            // Reset race state - timer will start when map loads
+            raceStartedAt = 0;
+            playerFinishedRace = false;
+            playerRaceTime = -1;
+            playerDNF = false;
+
+            // Reset opponent race state
+            opponentIsRacing = false;
+            opponentRaceTime = -1;
 
             // Download and load the race map from TMX
             DownloadAndLoadMapFromTMX(raceMapTmxId, raceMapName);
@@ -149,6 +163,20 @@
             // Defender finished their race
             defenderTime = int(msg["time"]);
             print("[Chess] Defender finished race in " + defenderTime + "ms");
+        } else if (t == "opponent_race_started") {
+            // Opponent started racing
+            opponentIsRacing = true;
+            opponentRaceTime = 0;
+            print("[Chess] Opponent started racing");
+        } else if (t == "opponent_race_time") {
+            // Opponent's live race time update
+            opponentRaceTime = int(msg["time"]);
+            opponentIsRacing = true;
+        } else if (t == "opponent_retired") {
+            // Opponent retired/respawned
+            opponentIsRacing = false;
+            opponentRaceTime = -1;
+            print("[Chess] Opponent retired/respawned");
         } else if (t == "race_result") {
             // Race completed, apply the result
             bool captureSucceeded = bool(msg["captureSucceeded"]);

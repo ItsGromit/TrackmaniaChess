@@ -1,6 +1,7 @@
 bool showWindow = false;
 bool windowResizeable = false;
 bool showColorCustomizationWindow = false;
+bool collapseChessWindow = false;
 enum MenuTab {
     Home,
     Play,

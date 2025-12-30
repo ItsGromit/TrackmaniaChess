@@ -2,7 +2,15 @@
   "permissions": {
     "allow": [
       "Bash(dir:*)",
-      "Bash(del ASSET_SERVER.md RAILWAY_SETUP.md)"
+      "Bash(del ASSET_SERVER.md RAILWAY_SETUP.md)",
+      "Bash(grep:*)",
+      "Bash(cat:*)",
+      "Bash(git clone:*)",
+      "Bash(findstr:*)",
+      "Bash(curl:*)",
+      "Bash(python:*)",
+      "WebSearch",
+      "WebFetch"
     ]
   }
 }

@@ -16,10 +16,11 @@ function handleCreateLobby(socket, msg) {
     password: msg.password || "",
     open: true,
     raceMode: msg.raceMode || "capture",  // Store race mode
-    mapFilters: {} // Initialize with empty filters (will use defaults)
+    mapFilters: {}, // Initialize with empty filters (will use defaults)
+    mappackId: msg.mappackId || 7237 // Store mappack ID for Chess Race mode (default to 7237)
   };
   lobbies.set(id, lobby);
-  console.log(`[Lobby] Created lobby ${id}${lobby.title ? ` (${lobby.title})` : ''} [${lobby.raceMode}] for socket ${socket.id}, sending confirmation...`);
+  console.log(`[Lobby] Created lobby ${id}${lobby.title ? ` (${lobby.title})` : ''} [${lobby.raceMode}]${lobby.raceMode === 'square' ? ` (mappack: ${lobby.mappackId})` : ''} for socket ${socket.id}, sending confirmation...`);
   const confirmation = { type: 'lobby_created', lobbyId: id };
   console.log('[Lobby] Sending confirmation:', JSON.stringify(confirmation));
   send(socket, confirmation);
@@ -164,7 +165,9 @@ function handleStartGame(socket, msg) {
     isWhite: p1IsWhite,
     opponentId: p2.id,
     fen: chess.fen(),
-    turn: 'w'
+    turn: 'w',
+    raceMode: l.raceMode,
+    mappackId: l.mappackId
   });
   send(p2, {
     type: 'game_start',
@@ -172,7 +175,9 @@ function handleStartGame(socket, msg) {
     isWhite: !p1IsWhite,
     opponentId: p1.id,
     fen: chess.fen(),
-    turn: 'w'
+    turn: 'w',
+    raceMode: l.raceMode,
+    mappackId: l.mappackId
   });
 
   // Keep the lobby alive for rematches instead of deleting it

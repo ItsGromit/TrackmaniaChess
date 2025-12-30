@@ -31,6 +31,18 @@ void HandleSquareClick(int row, int col) {
             selectedRow = row; selectedCol = col;
             return;
         } else {
+            // Check if clicking on another piece of the same color - reselect it
+            Piece@ clickedPiece = board[row][col];
+            if (clickedPiece !is null && clickedPiece.type != PieceType::Empty) {
+                bool isClickedPieceWhite = (clickedPiece.color == PieceColor::White);
+                if (isClickedPieceWhite == isWhite) {
+                    // Reselect the new piece
+                    gSelR = row; gSelC = col;
+                    selectedRow = row; selectedCol = col;
+                    return;
+                }
+            }
+
             if (!IsValidMove(gSelR, gSelC, row, col)) {
                 gSelR = gSelC = -1;
                 selectedRow = selectedCol = -1;
@@ -74,6 +86,17 @@ void HandleSquareClick(int row, int col) {
         selectedRow = row; selectedCol = col;
         return;
     } else {
+        // Check if clicking on another piece of the same color - reselect it
+        Piece@ clickedPiece = board[row][col];
+        if (clickedPiece !is null && clickedPiece.type != PieceType::Empty) {
+            if (clickedPiece.color == currentTurn) {
+                // Reselect the new piece
+                gSelR = row; gSelC = col;
+                selectedRow = row; selectedCol = col;
+                return;
+            }
+        }
+
         int fr = gSelR, fc = gSelC;
         gSelR = gSelC = -1;
         selectedRow = selectedCol = -1;

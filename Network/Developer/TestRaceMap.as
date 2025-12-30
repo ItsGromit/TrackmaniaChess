@@ -47,9 +47,13 @@ void FetchTestRaceMap() {
     captureFrom = "e2";
     captureTo = "e4";
     defenderTime = -1;
+    // Reset race state - timer will start when map loads
+    playerFinishedRace = false;
+    playerRaceTime = -1;
+    playerDNF = false;
+    raceStartedAt = 0;
     print("[Chess] Test Race - Map: " + raceMapName + ", You are: " + (isDefender ? "Defender" : "Attacker"));
     GameManager::currentState = GameState::RaceChallenge;
-    raceStartedAt = Time::Now;
     // Download and load the map from TMX
     DownloadAndLoadMapFromTMX(tmxId, testMapName);
 }

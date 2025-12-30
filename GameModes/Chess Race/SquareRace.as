@@ -40,12 +40,10 @@ void InitializeChessRace() {
 void InitializeAndAssignMaps() {
     InitializeChessRace();
 
-    // Use mappack if configured, otherwise use random campaign maps
-    if (useSpecificMappack && squareRaceMappackId > 0) {
-        MapAssignment::AssignMapsFromMappack(squareRaceMappackId);
-    } else {
-        MapAssignment::AssignRandomMapsToBoard();
-    }
+    // Use the mappack ID received from the server (stored in activeMappackId)
+    // This ensures both players have the same map assignments
+    MapAssignment::AssignMapsFromMappack(activeMappackId);
+    print("[ChessRace] Initializing maps from server-specified mappack: " + activeMappackId);
 }
 
 } // namespace ChessRace

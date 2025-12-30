@@ -52,4 +52,7 @@ void MainMenu() {
 
     // Render map filters popup window (independent of main window)
     Lobby::RenderMapFiltersWindow();
+
+    // Render color customization window (independent of main window)
+    ColorCustomization::RenderWindow();
 }

@@ -6,7 +6,7 @@ class PieceAssets {
     UI::Texture@ bK; UI::Texture@ bQ; UI::Texture@ bR; UI::Texture@ bB; UI::Texture@ bN; UI::Texture@ bP;
 
     // Base URL for texture downloads
-    string BASE_URL = "https://trackmaniachess.up.railway.app/assets/";
+    string BASE_URL = "https://tmchessassets-production.up.railway.app/assets/";
 
     void Load() {
         // Loading textures from remote server
@@ -60,11 +60,19 @@ class PieceAssets {
         // Try to load from cache first
         if (IO::FileExists(cachePath)) {
             trace("[PieceAssets] Loading from cache: " + filename);
-            IO::FileSource fs(cachePath);
-            if (fs.Size() > 0) {
-                auto buf = fs.Read(fs.Size());
-                auto tex = UI::LoadTexture(buf);
-                if (tex !is null) return tex;
+            try {
+                IO::File file(cachePath, IO::FileMode::Read);
+                if (file.Size() > 0) {
+                    auto buf = file.Read(file.Size());
+                    file.Close();
+                    auto tex = UI::LoadTexture(buf);
+                    if (tex !is null) return tex;
+                }
+                file.Close();
+            } catch {
+                warn("[PieceAssets] Failed to load cached file, deleting: " + filename);
+                // Delete corrupted cache file
+                IO::Delete(cachePath);
             }
         }
 

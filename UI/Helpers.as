@@ -28,6 +28,12 @@ void RenderLockButton(const string &in uniqueId, float barHeight) {
     // Lock button at right
     UI::SetCursorPos(vec2(barCursor.x + contentAvail.x - lockButtonWidth, barCursor.y));
     string lockText = windowResizeable ? Icons::Unlock : Icons::Lock;
+
+    // Apply theme colors to lock button
+    UI::PushStyleColor(UI::Col::Button, themeInactiveTabColor);
+    UI::PushStyleColor(UI::Col::ButtonHovered, themeActiveTabColor);
+    UI::PushStyleColor(UI::Col::ButtonActive, themeActiveTabColor);
+
     if (UI::Button(lockText + "##" + uniqueId, vec2(lockButtonWidth, barHeight))) {
         if (UI::IsKeyDown(UI::Key::LeftShift) || UI::IsKeyDown(UI::Key::RightShift)) {
             UI::SetWindowSize(vec2(defaultWidth, defaultHeight));
@@ -36,6 +42,8 @@ void RenderLockButton(const string &in uniqueId, float barHeight) {
             windowResizeable = !windowResizeable;
         }
     }
+
+    UI::PopStyleColor(3);
     if (UI::IsItemHovered()) {
         UI::BeginTooltip();
         if (UI::IsKeyDown(UI::Key::LeftShift) || UI::IsKeyDown(UI::Key::RightShift)) {

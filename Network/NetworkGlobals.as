@@ -34,6 +34,14 @@ bool isDefender = false;
 int defenderTime = -1;
 string captureFrom = "";
 string captureTo = "";
+int activeMappackId = 7237; // Mappack ID received from server for current game
+
+// Live race tracking
+int opponentRaceTime = -1;          // Opponent's current race time (-1 if not racing)
+bool opponentIsRacing = false;       // Whether opponent is currently racing
+uint64 lastRaceUpdateSent = 0;       // Last time we sent a race update (throttle to avoid spam)
+int lastPlayerStartTime = -1;        // Track player's last start time to detect restarts
+int lastPlayerRaceTime = 0;          // Track last race time to detect if time went backwards (full restart)
 
 const array<string> FILES = {"a", "b", "c", "d", "e", "f", "g", "h"};
 

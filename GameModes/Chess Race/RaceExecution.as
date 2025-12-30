@@ -50,13 +50,17 @@ void FetchSquareRaceMap(int row, int col) {
     raceMapTmxId = mapData.tmxId;
     raceMapName = mapData.mapName;
 
-    // Download and load the map
-    DownloadAndLoadMapFromTMX(mapData.tmxId, mapData.mapName);
-
     // Reset race state
     playerFinishedRace = false;
     playerRaceTime = -1;
     playerDNF = false;
+    raceStartedAt = 0;
+
+    // Set game state to RaceChallenge (this triggers the race UI)
+    GameManager::currentState = GameState::RaceChallenge;
+
+    // Download and load the map
+    DownloadAndLoadMapFromTMX(mapData.tmxId, mapData.mapName);
 }
 
 /**

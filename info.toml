@@ -4,3 +4,7 @@ author = "ItsGromit"
 category = "Game"
 version = "0.9"
 siteid = ""
+perms = "paid"
+
+[dependencies]
+MLFeedRaceData = ">=4.0.0"

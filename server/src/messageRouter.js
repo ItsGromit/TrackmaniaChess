@@ -41,8 +41,13 @@ async function onMessage(socket, msg) {
       return await gameHandlers.handleRerollRequest(socket, msg);
     case 'reroll_response':
       return await gameHandlers.handleRerollResponse(socket, msg);
+    case 'race_started':
+      return raceHandlers.handleRaceStarted(socket, msg);
+    case 'race_time_update':
+      return raceHandlers.handleRaceTimeUpdate(socket, msg);
     case 'race_result':
       return raceHandlers.handleRaceResult(socket, msg);
+    case 'dnf':
     case 'race_retire':
       return raceHandlers.handleRaceRetire(socket, msg);
 

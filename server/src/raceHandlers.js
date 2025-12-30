@@ -88,6 +88,10 @@ function handleRaceRetire(socket, msg) {
 
   console.log(`[Chess] Player retired from race: ${isDefender ? 'defender' : 'attacker'}`);
 
+  // Notify opponent that player retired
+  const opponent = isDefender ? challenge.attacker : challenge.defender;
+  send(opponent, { type: 'opponent_retired' });
+
   // Check if player has already submitted a time or retired
   if (isDefender && challenge.defenderTime !== null) {
     console.log('[Chess] Defender already submitted a time/retired, ignoring');
@@ -145,7 +149,43 @@ function handleRaceRetire(socket, msg) {
   }
 }
 
+// Handle race_started message
+function handleRaceStarted(socket, msg) {
+  const challenge = raceChallenges.get(msg.gameId);
+  if (!challenge) return console.log('[Chess] No race challenge found for game:', msg.gameId);
+
+  const game = games.get(msg.gameId);
+  if (!game) return;
+
+  const isDefender = socket === challenge.defender;
+  const isAttacker = socket === challenge.attacker;
+
+  console.log(`[Chess] Player started racing: ${isDefender ? 'defender' : 'attacker'}`);
+
+  // Notify opponent that player started racing
+  const opponent = isDefender ? challenge.attacker : challenge.defender;
+  send(opponent, { type: 'opponent_race_started' });
+}
+
+// Handle race_time_update message
+function handleRaceTimeUpdate(socket, msg) {
+  const challenge = raceChallenges.get(msg.gameId);
+  if (!challenge) return;
+
+  const game = games.get(msg.gameId);
+  if (!game) return;
+
+  const isDefender = socket === challenge.defender;
+  const time = msg.time;
+
+  // Broadcast live time to opponent
+  const opponent = isDefender ? challenge.attacker : challenge.defender;
+  send(opponent, { type: 'opponent_race_time', time });
+}
+
 module.exports = {
   handleRaceResult,
-  handleRaceRetire
+  handleRaceRetire,
+  handleRaceStarted,
+  handleRaceTimeUpdate
 };
