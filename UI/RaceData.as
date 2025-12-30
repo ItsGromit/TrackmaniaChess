@@ -58,7 +58,20 @@ int GetCurrentRaceTime() {
     }
 
     auto player = cast<CSmPlayer>(playground.GameTerminals[0].ControlledPlayer);
-    if (player is null || player.ScriptAPI is null) {
+    if (player is null) {
+        return 0;
+    }
+
+    // If player has finished, return their finished time from Score
+    if (player.Score !is null) {
+        auto score = cast<CSmArenaScore>(player.Score);
+        if (score !is null && score.BestRaceTimes.Length > 0 && score.BestRaceTimes[0] > 0) {
+            return int(score.BestRaceTimes[0]);
+        }
+    }
+
+    // Otherwise, calculate ongoing race time
+    if (player.ScriptAPI is null) {
         return 0;
     }
 

@@ -142,9 +142,7 @@ void AssignMapsFromMappack(int mappackId) {
             boardMaps[row][col].tmxId = mapId;
             boardMaps[row][col].mapName = string(mapObj["Name"]);
             boardMaps[row][col].mapUid = string(mapObj["MapUid"]);
-
-            // Construct thumbnail URL from MapId
-            boardMaps[row][col].thumbnailUrl = "https://trackmania.exchange/maps/screenshot/normal/" + mapId;
+            boardMaps[row][col].thumbnailUrl = "https://trackmania.exchange/mapthumb/" + mapId;
 
             // AuthorTime not included in minimal field request, set to -1
             boardMaps[row][col].authorTime = -1;

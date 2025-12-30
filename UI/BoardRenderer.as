@@ -120,7 +120,13 @@ void BoardRender() {
             bool clicked = UI::Button("##" + row + "_" + col, vec2(squareSize, squareSize));
             if (clicked && !gameOver && GameManager::currentState != GameState::GameOver) HandleSquareClick(row, col);
 
-            // 2) Overlay the piece texture using the window draw list (on top of the button)
+            // 2) Render map thumbnail (when enabled)
+            // Must be called after button so GetItemRect() works correctly
+            if (showThumbnails) {
+                RaceMode::ThumbnailRendering::RenderMapThumbnail(row, col);
+            }
+
+            // 3) Overlay the piece texture using the window draw list (on top of the button and thumbnail)
             UI::Texture@ tex = GetPieceTexture(board[row][col]);
             DrawCenteredImageOverLastItem(tex, 6.0f);
 
