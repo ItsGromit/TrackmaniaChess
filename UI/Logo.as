@@ -9,14 +9,19 @@ UI::Texture@ logoTexture = null;
 // Base URL for asset downloads
 const string LOGO_BASE_URL = "https://tmchessassets-production.up.railway.app/assets/";
 
+// Loading tracking
+bool isLoadingLogo = false;
+
 /**
  * Loads the TMChess logo from cache or downloads it
  */
 void LoadLogo() {
+    isLoadingLogo = true;
     @logoTexture = LoadLogoTexture("TMChess.png");
     if (logoTexture !is null) {
         print("[Logo] TMChess logo loaded successfully");
     }
+    isLoadingLogo = false;
 }
 
 /**

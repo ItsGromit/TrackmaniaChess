@@ -8,23 +8,32 @@ class PieceAssets {
     // Base URL for texture downloads
     string BASE_URL = "https://tmchessassets-production.up.railway.app/assets/";
 
+    // Loading tracking
+    bool isLoading = false;
+    int piecesLoaded = 0;
+    int totalPieces = 12;
+
     void Load() {
+        isLoading = true;
+        piecesLoaded = 0;
+
         // Loading textures from remote server
         // White
-        @wK = LoadTex("king_white.png");
-        @wQ = LoadTex("queen_white.png");
-        @wR = LoadTex("rook_white.png");
-        @wB = LoadTex("bishop_white.png");
-        @wN = LoadTex("knight_white.png");
-        @wP = LoadTex("pawn_white.png");
+        @wK = LoadTex("king_white.png"); piecesLoaded++;
+        @wQ = LoadTex("queen_white.png"); piecesLoaded++;
+        @wR = LoadTex("rook_white.png"); piecesLoaded++;
+        @wB = LoadTex("bishop_white.png"); piecesLoaded++;
+        @wN = LoadTex("knight_white.png"); piecesLoaded++;
+        @wP = LoadTex("pawn_white.png"); piecesLoaded++;
         // Black
-        @bK = LoadTex("king_black.png");
-        @bQ = LoadTex("queen_black.png");
-        @bR = LoadTex("rook_black.png");
-        @bB = LoadTex("bishop_black.png");
-        @bN = LoadTex("knight_black.png");
-        @bP = LoadTex("pawn_black.png");
+        @bK = LoadTex("king_black.png"); piecesLoaded++;
+        @bQ = LoadTex("queen_black.png"); piecesLoaded++;
+        @bR = LoadTex("rook_black.png"); piecesLoaded++;
+        @bB = LoadTex("bishop_black.png"); piecesLoaded++;
+        @bN = LoadTex("knight_black.png"); piecesLoaded++;
+        @bP = LoadTex("pawn_black.png"); piecesLoaded++;
 
+        isLoading = false;
         print("[PieceAssets] All piece assets loaded successfully");
     }
     // Assign textures to pieces

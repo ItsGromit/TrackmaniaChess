@@ -274,26 +274,42 @@ void PreloadAllThumbnails() {
 }
 
 /**
- * Returns whether thumbnails are currently being loaded
+ * Returns whether any assets are currently being loaded (thumbnails, pieces, or logo)
  */
 bool IsLoadingThumbnails() {
-    return isLoadingThumbnails;
+    return isLoadingThumbnails || gPieces.isLoading || isLoadingLogo;
 }
 
 /**
  * Returns the loading progress (0.0 to 1.0)
  */
 float GetLoadingProgress() {
-    if (totalThumbnailsToLoad == 0) return 1.0f;
-    return float(thumbnailsLoaded) / float(totalThumbnailsToLoad);
+    // Calculate total items to load
+    int totalItems = totalThumbnailsToLoad + gPieces.totalPieces + 1; // thumbnails + pieces + logo
+    if (totalItems == 0) return 1.0f;
+
+    // Calculate loaded items
+    int loadedItems = thumbnailsLoaded;
+    if (!gPieces.isLoading) loadedItems += gPieces.totalPieces;
+    else loadedItems += gPieces.piecesLoaded;
+    if (!isLoadingLogo) loadedItems += 1;
+
+    return float(loadedItems) / float(totalItems);
 }
 
 /**
  * Returns formatted loading text
  */
 string GetLoadingText() {
-    if (!isLoadingThumbnails) return "Ready";
-    return "Loading thumbnails... " + thumbnailsLoaded + "/" + totalThumbnailsToLoad;
+    // Check what's currently loading
+    if (isLoadingLogo) {
+        return "Loading logo...";
+    } else if (gPieces.isLoading) {
+        return "Loading piece assets... " + gPieces.piecesLoaded + "/" + gPieces.totalPieces;
+    } else if (isLoadingThumbnails) {
+        return "Loading thumbnails... " + thumbnailsLoaded + "/" + totalThumbnailsToLoad;
+    }
+    return "Ready";
 }
 
 /**
