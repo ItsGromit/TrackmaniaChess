@@ -116,6 +116,21 @@ void HandleSquareClick(int row, int col) {
                 return; // Invalid move - would put own king in check
             }
 
+            // Check if this is a pawn promotion
+            Piece movingPiece = board[fr][fc];
+            if (movingPiece.type == PieceType::Pawn && (row == 0 || row == 7)) {
+                // Set pending promotion state
+                isPendingPromotion = true;
+                promotionRow = row;
+                promotionCol = col;
+                // Store the move in selection vars for later execution
+                gSelR = fr;
+                gSelC = fc;
+                selectedRow = row;
+                selectedCol = col;
+                return;
+            }
+
             // Execute the player's move
             DummyClient::ExecutePlayerMove(fr, fc, row, col);
         }

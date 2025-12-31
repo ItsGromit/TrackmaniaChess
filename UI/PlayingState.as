@@ -56,6 +56,35 @@ void RenderPlayingState() {
     UI::SameLine();
 
     BoardRender();
+
+    // Render promotion dialog if pending
+    if (isPendingPromotion) {
+        PieceType selectedPiece = RenderPromotionDialog();
+        if (selectedPiece != PieceType::Empty) {
+            // Store move in history
+            Move@ m = Move(gSelR, gSelC, promotionRow, promotionCol);
+            m.capturePiece = board[promotionRow][promotionCol];
+            moveHistory.InsertLast(m);
+
+            // Execute the promotion move
+            ExecuteChessMove(gSelR, gSelC, promotionRow, promotionCol, selectedPiece);
+            currentTurn = (currentTurn == PieceColor::White) ? PieceColor::Black : PieceColor::White;
+
+            // Clear promotion state
+            isPendingPromotion = false;
+            promotionRow = -1;
+            promotionCol = -1;
+            gSelR = -1;
+            gSelC = -1;
+            selectedRow = -1;
+            selectedCol = -1;
+
+            // Check for game over (practice mode only)
+            if (DummyClient::enabled) {
+                DummyClient::CheckGameOver();
+            }
+        }
+    }
 }
 
 /**
@@ -102,6 +131,12 @@ void RenderMoveHistory(float moveHistoryWidth, float availableHeight, float belo
                 bool dummyPlaysWhite = DummyClient::isMyTurn; // If it's dummy's turn now, dummy was white
                 InitializeGlobals();
                 ApplyFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", "w");
+
+                // Set loading state for thumbnails if needed
+                if (currentRaceMode == RaceMode::SquareRace && showThumbnails) {
+                    RaceMode::ThumbnailRendering::isLoadingThumbnails = true;
+                }
+
                 GameManager::currentState = GameState::Playing;
                 DummyClient::StartGame(dummyPlaysWhite);
             }

@@ -25,7 +25,7 @@ class PieceAssets {
         @bN = LoadTex("knight_black.png");
         @bP = LoadTex("pawn_black.png");
 
-        trace("[PieceAssets] loaded");
+        print("[PieceAssets] All piece assets loaded successfully");
     }
     // Assign textures to pieces
     UI::Texture@ GetTexture(const Piece &in p) const {
@@ -52,6 +52,38 @@ class PieceAssets {
         }
         return null;
     }
+    // Clears all piece textures from memory and cache
+    void ClearCache() {
+        print("[PieceAssets] Clearing piece texture cache...");
+
+        // Clear memory references
+        @wK = null; @wQ = null; @wR = null; @wB = null; @wN = null; @wP = null;
+        @bK = null; @bQ = null; @bR = null; @bB = null; @bN = null; @bP = null;
+
+        // Delete cached files
+        string texturesFolder = IO::FromStorageFolder("textures");
+        if (IO::FolderExists(texturesFolder)) {
+            array<string> files = {
+                "king_white.png", "queen_white.png", "rook_white.png",
+                "bishop_white.png", "knight_white.png", "pawn_white.png",
+                "king_black.png", "queen_black.png", "rook_black.png",
+                "bishop_black.png", "knight_black.png", "pawn_black.png"
+            };
+
+            int deletedCount = 0;
+            for (uint i = 0; i < files.Length; i++) {
+                string filePath = texturesFolder + "/" + files[i];
+                if (IO::FileExists(filePath)) {
+                    IO::Delete(filePath);
+                    deletedCount++;
+                }
+            }
+            print("[PieceAssets] Deleted " + deletedCount + " cached piece textures");
+        }
+
+        print("[PieceAssets] Cache cleared");
+    }
+
     // internal texture buffer - downloads from server and caches locally
     private UI::Texture@ LoadTex(const string &in filename) {
         // Check if texture is already cached locally

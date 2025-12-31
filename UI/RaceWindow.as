@@ -144,6 +144,22 @@ void RenderRaceWindow() {
                 int milliseconds = playerRaceTime % 1000;
                 UI::Text("Your Time: \\$fff" + seconds + "." + Text::Format("%03d", milliseconds) + "s");
             }
+
+            UI::NewLine();
+
+            // In practice mode, show continue button to return to chess board
+            if (gameId == "") {
+                if (StyledButton("Continue to Chess Board", vec2(200.0f, 30.0f))) {
+                    // Return to chess board
+                    GameManager::currentState = GameState::Playing;
+                    playerFinishedRace = false;
+                    playerDNF = false;
+                    playerRaceTime = 0;
+                }
+            } else {
+                // In network mode, wait for opponent
+                UI::Text("\\$888Waiting for opponent to finish...");
+            }
         }
     }
     UI::End();

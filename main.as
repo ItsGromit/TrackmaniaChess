@@ -2,6 +2,7 @@ void Main() {
     Init();
     InitializeGlobals();
     LoadPieceAssets();
+    LoadLogo();
 }
 
 void Update(float dt) {

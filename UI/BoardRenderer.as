@@ -8,6 +8,12 @@
  * Renders the chess board with pieces
  */
 void BoardRender() {
+    // Check if thumbnails are loading (only when thumbnails are enabled)
+    if (showThumbnails && RaceMode::ThumbnailRendering::IsLoadingThumbnails()) {
+        RenderThumbnailLoadingScreen();
+        return;
+    }
+
     UI::BeginGroup();
 
     // Calculate sizes based on the context from MainMenu
@@ -130,6 +136,80 @@ void BoardRender() {
             UI::Texture@ tex = GetPieceTexture(board[row][col]);
             DrawCenteredImageOverLastItem(tex, 6.0f);
 
+            // 4) Right-click tooltip for map info (Chess Race mode only)
+            if (currentRaceMode == RaceMode::SquareRace) {
+                // Handle right-click to show tooltip
+                if (UI::IsItemHovered() && UI::IsMouseClicked(UI::MouseButton::Right)) {
+                    RaceMode::SquareMapData@ mapData = RaceMode::MapAssignment::GetSquareMap(row, col);
+                    if (mapData !is null && mapData.tmxId > 0) {
+                        // Set this square to show tooltip
+                        mapInfoTooltipRow = row;
+                        mapInfoTooltipCol = col;
+                    }
+                }
+
+                // Hide tooltip if mouse moves away from the tracked square
+                if (mapInfoTooltipRow == row && mapInfoTooltipCol == col) {
+                    if (!UI::IsItemHovered()) {
+                        // Mouse left this square, hide tooltip
+                        mapInfoTooltipRow = -1;
+                        mapInfoTooltipCol = -1;
+                    }
+                }
+
+                // Show tooltip if this is the tracked square and mouse is hovering
+                if (mapInfoTooltipRow == row && mapInfoTooltipCol == col && UI::IsItemHovered()) {
+                    RaceMode::SquareMapData@ mapData = RaceMode::MapAssignment::GetSquareMap(row, col);
+                    if (mapData !is null && mapData.tmxId > 0) {
+                        UI::BeginTooltip();
+                        UI::Text("\\$z" + mapData.mapName);
+                        UI::Separator();
+
+                        UI::Text("TMX ID: " + mapData.tmxId);
+
+                        if (mapData.tags.Length > 0) {
+                            UI::Text("Tags:");
+                            UI::Dummy(vec2(0, 3)); // Small spacing
+
+                            // Render tags as colored circular badges in a line
+                            for (uint i = 0; i < mapData.tags.Length; i++) {
+                                RaceMode::MapTag@ tag = mapData.tags[i];
+
+                                // Parse hex color from TMX (format: "RRGGBB")
+                                vec4 tagColor = vec4(0.5f, 0.5f, 0.5f, 1.0f); // Default gray
+                                if (tag.color.Length == 6) {
+                                    // Parse RGB from hex string
+                                    int r = Text::ParseInt(tag.color.SubStr(0, 2), 16);
+                                    int g = Text::ParseInt(tag.color.SubStr(2, 2), 16);
+                                    int b = Text::ParseInt(tag.color.SubStr(4, 2), 16);
+                                    tagColor = vec4(r / 255.0f, g / 255.0f, b / 255.0f, 1.0f);
+                                }
+
+                                // Push rounded button style
+                                UI::PushStyleVar(UI::StyleVar::FrameRounding, 12.0f);
+                                UI::PushStyleColor(UI::Col::Button, tagColor);
+                                UI::PushStyleColor(UI::Col::ButtonHovered, tagColor * 1.1f);
+                                UI::PushStyleColor(UI::Col::ButtonActive, tagColor * 0.9f);
+
+                                // Render tag as button
+                                UI::Button(tag.name + "##tag_" + i, vec2(0, 24));
+
+                                UI::PopStyleColor(3);
+                                UI::PopStyleVar();
+
+                                // Keep tags on same line
+                                if (i < mapData.tags.Length - 1) {
+                                    UI::SameLine();
+                                }
+                            }
+                        } else {
+                            UI::Text("Tags: None");
+                        }
+                        UI::EndTooltip();
+                    }
+                }
+            }
+
             UI::PopStyleColor(3);
 
             if (col < 7) UI::SameLine();
@@ -137,5 +217,66 @@ void BoardRender() {
     }
 
     UI::PopStyleVar();
+    UI::EndGroup();
+}
+
+/**
+ * Renders a loading screen while thumbnails are being downloaded
+ */
+void RenderThumbnailLoadingScreen() {
+    vec2 contentRegion = UI::GetContentRegionAvail();
+
+    // Calculate loading box size based on available space
+    float maxLoadingBoxWidth = Math::Min(400.0f, contentRegion.x - 40.0f);
+    float maxLoadingBoxHeight = Math::Min(200.0f, contentRegion.y - 40.0f);
+
+    // Center the loading content
+    vec2 loadingBoxPos = vec2(
+        (contentRegion.x - maxLoadingBoxWidth) * 0.5f,
+        (contentRegion.y - maxLoadingBoxHeight) * 0.5f
+    );
+
+    UI::SetCursorPos(UI::GetCursorPos() + loadingBoxPos);
+
+    // Render loading content without child window to avoid scrollbars
+    UI::BeginGroup();
+
+    UI::Dummy(vec2(0, maxLoadingBoxHeight * 0.1f)); // Top spacing
+
+    // Title - centered
+    string titleText = Icons::Hourglass + " Loading Thumbnails";
+    vec2 titleSize = Draw::MeasureString(titleText);
+    vec2 currentPos = UI::GetCursorPos();
+    UI::SetCursorPos(vec2(currentPos.x + (maxLoadingBoxWidth - titleSize.x) * 0.5f, currentPos.y));
+    UI::Text("\\$z" + titleText);
+
+    UI::Dummy(vec2(0, maxLoadingBoxHeight * 0.1f)); // Spacing
+
+    // Progress bar - centered
+    float progressBarWidth = Math::Min(maxLoadingBoxWidth - 40.0f, 360.0f);
+    currentPos = UI::GetCursorPos();
+    UI::SetCursorPos(vec2(currentPos.x + (maxLoadingBoxWidth - progressBarWidth) * 0.5f, currentPos.y));
+    float progress = RaceMode::ThumbnailRendering::GetLoadingProgress();
+    UI::ProgressBar(progress, vec2(progressBarWidth, 30.0f));
+
+    UI::Dummy(vec2(0, 10.0f)); // Spacing
+
+    // Status text - centered
+    string statusText = RaceMode::ThumbnailRendering::GetLoadingText();
+    vec2 statusSize = Draw::MeasureString(statusText);
+    currentPos = UI::GetCursorPos();
+    UI::SetCursorPos(vec2(currentPos.x + (maxLoadingBoxWidth - statusSize.x) * 0.5f, currentPos.y));
+    UI::Text(statusText);
+
+    UI::Dummy(vec2(0, maxLoadingBoxHeight * 0.15f)); // Spacing
+
+    // Skip button - centered
+    float buttonWidth = 150.0f;
+    currentPos = UI::GetCursorPos();
+    UI::SetCursorPos(vec2(currentPos.x + (maxLoadingBoxWidth - buttonWidth) * 0.5f, currentPos.y));
+    if (StyledButton("Skip and Show Board", vec2(buttonWidth, 30.0f))) {
+        RaceMode::ThumbnailRendering::isLoadingThumbnails = false;
+    }
+
     UI::EndGroup();
 }

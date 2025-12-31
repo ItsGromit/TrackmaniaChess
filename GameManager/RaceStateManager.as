@@ -79,9 +79,13 @@ void Update() {
                                 // In network mode, keep race window open to show result
                                 // Race window will stay up until server sends race_result message with both times
                             } else {
-                                // In practice mode, exit immediately since there's no opponent
-                                print("[RaceDetection] Practice mode - exiting race state");
-                                GameManager::currentState = GameState::Playing;
+                                // In practice mode, send player back to main menu and keep race window open
+                                print("[RaceDetection] Practice mode - showing race result");
+                                auto app2 = cast<CTrackMania>(GetApp());
+                                app2.BackToMainMenu();
+
+                                // Keep race window open showing the player's time
+                                // Player can manually close it or click continue to return to chess board
                             }
 
                             // Reset race tracking variables
@@ -194,9 +198,13 @@ void Update() {
                                 // In network mode, keep race window open to show result
                                 // Race window will stay up until server sends race_result message with both times
                             } else {
-                                // In practice mode, exit immediately since there's no opponent
-                                print("[RaceDetection] Practice mode - exiting race state");
-                                GameManager::currentState = GameState::Playing;
+                                // In practice mode, send player back to main menu and keep race window open
+                                print("[RaceDetection] Practice mode - showing DNF result");
+                                auto app3 = cast<CTrackMania>(GetApp());
+                                app3.BackToMainMenu();
+
+                                // Keep race window open showing DNF
+                                // Player can manually close it or click continue to return to chess board
                             }
 
                             // Reset race tracking variables

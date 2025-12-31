@@ -44,6 +44,11 @@ void InitializeAndAssignMaps() {
     // This ensures both players have the same map assignments
     MapAssignment::AssignMapsFromMappack(activeMappackId);
     print("[ChessRace] Initializing maps from server-specified mappack: " + activeMappackId);
+
+    // Preload thumbnails if enabled
+    if (showThumbnails) {
+        ThumbnailRendering::PreloadAllThumbnails();
+    }
 }
 
 } // namespace ChessRace

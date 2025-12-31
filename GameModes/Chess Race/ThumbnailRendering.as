@@ -9,6 +9,11 @@ namespace ThumbnailRendering {
 // Dictionary to track downloads by URL (since we can't pass objects directly)
 dictionary@ downloadingSquares = dictionary();
 
+// Loading state tracking
+bool isLoadingThumbnails = false;
+int totalThumbnailsToLoad = 0;
+int thumbnailsLoaded = 0;
+
 /**
  * Downloads and caches a map thumbnail image
  *
@@ -27,7 +32,45 @@ void DownloadThumbnail(SquareMapData@ squareData) {
         return;
     }
 
-    print("[ThumbnailRendering] Downloading thumbnail for " + squareData.mapName + " from " + squareData.thumbnailUrl);
+    // Check if thumbnail is already cached locally
+    string filename = "thumb_" + squareData.tmxId + ".jpg";
+    string cachePath = IO::FromStorageFolder("textures/thumbnails/" + filename);
+
+    // Try to load from cache first
+    if (IO::FileExists(cachePath)) {
+        if (developerMode) print("[ThumbnailRendering] Loading thumbnail from cache: " + squareData.mapName);
+        try {
+            IO::File file(cachePath, IO::FileMode::Read);
+            if (file.Size() > 0) {
+                auto buf = file.Read(file.Size());
+                file.Close();
+                @squareData.thumbnailTexture = UI::LoadTexture(buf);
+                if (squareData.thumbnailTexture !is null) {
+                    if (developerMode) print("[ThumbnailRendering] Successfully loaded thumbnail from cache for " + squareData.mapName);
+
+                    // Increment loaded counter if we're in loading mode
+                    if (isLoadingThumbnails) {
+                        thumbnailsLoaded++;
+
+                        // Check if all thumbnails are loaded
+                        if (thumbnailsLoaded >= totalThumbnailsToLoad) {
+                            isLoadingThumbnails = false;
+                            if (developerMode) print("[ThumbnailRendering] All thumbnails loaded from cache (" + thumbnailsLoaded + "/" + totalThumbnailsToLoad + ")");
+                        }
+                    }
+
+                    return;
+                }
+            }
+            file.Close();
+        } catch {
+            warn("[ThumbnailRendering] Failed to load cached thumbnail, deleting: " + filename);
+            IO::Delete(cachePath);
+        }
+    }
+
+    // Download from server
+    if (developerMode) print("[ThumbnailRendering] Downloading thumbnail for " + squareData.mapName + " from " + squareData.thumbnailUrl);
     squareData.thumbnailLoading = true;
 
     // Store reference in dictionary and start async download
@@ -56,28 +99,68 @@ void DownloadThumbnailCoroutine(const string &in url) {
 
         // Check for errors
         if (req.ResponseCode() != 200) {
-            print("[ThumbnailRendering] Failed to download thumbnail: HTTP " + req.ResponseCode());
+            warn("[ThumbnailRendering] Failed to download thumbnail: HTTP " + req.ResponseCode());
             squareData.thumbnailLoading = false;
+            squareData.thumbnailFailed = true;
+            squareData.thumbnailRetryCount++;
             return;
         }
 
         // Get image data as buffer
         MemoryBuffer@ imageData = req.Buffer();
 
+        if (imageData.GetSize() == 0) {
+            warn("[ThumbnailRendering] Empty response for thumbnail: " + squareData.mapName);
+            squareData.thumbnailLoading = false;
+            squareData.thumbnailFailed = true;
+            squareData.thumbnailRetryCount++;
+            return;
+        }
+
+        // Cache the downloaded file
+        string filename = "thumb_" + squareData.tmxId + ".jpg";
+        string cachePath = IO::FromStorageFolder("textures/thumbnails/" + filename);
+        IO::CreateFolder(IO::FromStorageFolder("textures/thumbnails"), true);
+
+        try {
+            IO::File file(cachePath, IO::FileMode::Write);
+            file.Write(imageData);
+            file.Close();
+            if (developerMode) print("[ThumbnailRendering] Cached thumbnail: " + filename);
+        } catch {
+            warn("[ThumbnailRendering] Failed to cache thumbnail: " + filename);
+        }
+
         // Load texture from memory buffer
         @squareData.thumbnailTexture = UI::LoadTexture(imageData);
 
         if (squareData.thumbnailTexture !is null) {
-            print("[ThumbnailRendering] Successfully loaded thumbnail for " + squareData.mapName);
+            if (developerMode) print("[ThumbnailRendering] Successfully loaded thumbnail for " + squareData.mapName);
+            // Reset failed state on success
+            squareData.thumbnailFailed = false;
+            squareData.thumbnailRetryCount = 0;
         } else {
-            print("[ThumbnailRendering] Failed to create texture for " + squareData.mapName);
+            warn("[ThumbnailRendering] Failed to create texture for " + squareData.mapName);
+            squareData.thumbnailFailed = true;
+            squareData.thumbnailRetryCount++;
         }
 
     } catch {
-        print("[ThumbnailRendering] Exception downloading thumbnail: " + getExceptionInfo());
+        warn("[ThumbnailRendering] Exception downloading thumbnail: " + getExceptionInfo());
+        squareData.thumbnailFailed = true;
+        squareData.thumbnailRetryCount++;
     }
 
     squareData.thumbnailLoading = false;
+
+    // Increment loaded counter
+    thumbnailsLoaded++;
+
+    // Check if all thumbnails are loaded
+    if (isLoadingThumbnails && thumbnailsLoaded >= totalThumbnailsToLoad) {
+        isLoadingThumbnails = false;
+        print("[ThumbnailRendering] All thumbnails loaded (" + thumbnailsLoaded + "/" + totalThumbnailsToLoad + ")");
+    }
 
     // Clean up dictionary entry
     downloadingSquares.Delete(url);
@@ -99,7 +182,25 @@ void RenderMapThumbnail(int row, int col) {
 
     // If thumbnail not loaded, try to download it
     if (squareData.thumbnailTexture is null && !squareData.thumbnailLoading) {
-        DownloadThumbnail(squareData);
+        // Check if this thumbnail has failed and should retry
+        const int MAX_RETRY_COUNT = 3;
+        if (squareData.thumbnailFailed && squareData.thumbnailRetryCount < MAX_RETRY_COUNT) {
+            if (developerMode) print("[ThumbnailRendering] Retrying failed thumbnail for " + squareData.mapName + " (attempt " + (squareData.thumbnailRetryCount + 1) + "/" + MAX_RETRY_COUNT + ")");
+            squareData.thumbnailFailed = false; // Reset flag for retry
+            DownloadThumbnail(squareData);
+        } else if (!squareData.thumbnailFailed) {
+            // First download attempt
+            DownloadThumbnail(squareData);
+        } else {
+            // Exceeded max retries, log and skip
+            if (squareData.thumbnailRetryCount >= MAX_RETRY_COUNT) {
+                // Only log once when we first hit the limit
+                if (squareData.thumbnailRetryCount == MAX_RETRY_COUNT) {
+                    warn("[ThumbnailRendering] Max retries reached for " + squareData.mapName + ", giving up");
+                    squareData.thumbnailRetryCount++; // Increment to prevent repeated logging
+                }
+            }
+        }
         return; // Don't render until loaded
     }
 
@@ -128,43 +229,122 @@ void RenderMapThumbnail(int row, int col) {
  * Preloads thumbnails for all assigned maps
  */
 void PreloadAllThumbnails() {
-    print("[ThumbnailRendering] Preloading all thumbnails...");
+    if (developerMode) print("[ThumbnailRendering] Preloading all thumbnails...");
 
-    int downloadCount = 0;
+    // Set loading state immediately to show loading screen
+    isLoadingThumbnails = true;
 
+    // Reset counters
+    thumbnailsLoaded = 0;
+    totalThumbnailsToLoad = 0;
+
+    // Count thumbnails that need to be downloaded
+    for (int row = 0; row < 8; row++) {
+        for (int col = 0; col < 8; col++) {
+            SquareMapData@ squareData = MapAssignment::boardMaps[row][col];
+            if (squareData !is null && squareData.tmxId > 0) {
+                // Only count if not already loaded
+                if (squareData.thumbnailTexture is null && !squareData.thumbnailLoading) {
+                    totalThumbnailsToLoad++;
+                }
+            }
+        }
+    }
+
+    // If no thumbnails to load, immediately disable loading state
+    if (totalThumbnailsToLoad == 0) {
+        if (developerMode) print("[ThumbnailRendering] All thumbnails already cached");
+        isLoadingThumbnails = false;
+        return;
+    }
+
+    if (developerMode) print("[ThumbnailRendering] Need to download " + totalThumbnailsToLoad + " thumbnails");
+
+    // Start downloading
     for (int row = 0; row < 8; row++) {
         for (int col = 0; col < 8; col++) {
             SquareMapData@ squareData = MapAssignment::boardMaps[row][col];
             if (squareData !is null && squareData.tmxId > 0) {
                 DownloadThumbnail(squareData);
-                downloadCount++;
             }
         }
     }
 
-    print("[ThumbnailRendering] Started downloading " + downloadCount + " thumbnails");
+    if (developerMode) print("[ThumbnailRendering] Started downloading " + totalThumbnailsToLoad + " thumbnails");
 }
 
 /**
- * Clears all cached thumbnails to free memory
+ * Returns whether thumbnails are currently being loaded
+ */
+bool IsLoadingThumbnails() {
+    return isLoadingThumbnails;
+}
+
+/**
+ * Returns the loading progress (0.0 to 1.0)
+ */
+float GetLoadingProgress() {
+    if (totalThumbnailsToLoad == 0) return 1.0f;
+    return float(thumbnailsLoaded) / float(totalThumbnailsToLoad);
+}
+
+/**
+ * Returns formatted loading text
+ */
+string GetLoadingText() {
+    if (!isLoadingThumbnails) return "Ready";
+    return "Loading thumbnails... " + thumbnailsLoaded + "/" + totalThumbnailsToLoad;
+}
+
+/**
+ * Clears all cached thumbnails to free memory and delete cached files
  */
 void ClearThumbnailCache() {
-    print("[ThumbnailRendering] Clearing thumbnail cache...");
+    if (developerMode) print("[ThumbnailRendering] Clearing thumbnail cache...");
 
-    int clearedCount = 0;
+    int clearedMemoryCount = 0;
+    int deletedFileCount = 0;
 
-    for (int row = 0; row < 8; row++) {
-        for (int col = 0; col < 8; col++) {
-            SquareMapData@ squareData = MapAssignment::boardMaps[row][col];
-            if (squareData !is null) {
-                @squareData.thumbnailTexture = null;
-                squareData.thumbnailLoading = false;
-                clearedCount++;
+    // Clear memory references
+    if (MapAssignment::boardMaps.Length > 0) {
+        for (int row = 0; row < 8; row++) {
+            // Check if row is initialized
+            if (row >= int(MapAssignment::boardMaps.Length)) break;
+            if (MapAssignment::boardMaps[row].Length == 0) continue;
+
+            for (int col = 0; col < 8; col++) {
+                // Check if column is initialized
+                if (col >= int(MapAssignment::boardMaps[row].Length)) break;
+
+                SquareMapData@ squareData = MapAssignment::boardMaps[row][col];
+                if (squareData !is null) {
+                    @squareData.thumbnailTexture = null;
+                    squareData.thumbnailLoading = false;
+                    squareData.thumbnailFailed = false;
+                    squareData.thumbnailRetryCount = 0;
+                    clearedMemoryCount++;
+                }
             }
         }
     }
 
-    print("[ThumbnailRendering] Cleared " + clearedCount + " thumbnails from cache");
+    // Delete cached files from disk
+    string thumbnailsFolder = IO::FromStorageFolder("textures/thumbnails");
+    if (IO::FolderExists(thumbnailsFolder)) {
+        array<string> files = IO::IndexFolder(thumbnailsFolder, false);
+        for (uint i = 0; i < files.Length; i++) {
+            // Only delete .jpg files
+            if (files[i].EndsWith(".jpg")) {
+                string filePath = thumbnailsFolder + "/" + files[i];
+                if (IO::FileExists(filePath)) {
+                    IO::Delete(filePath);
+                    deletedFileCount++;
+                }
+            }
+        }
+    }
+
+    if (developerMode) print("[ThumbnailRendering] Cleared " + clearedMemoryCount + " thumbnails from memory, deleted " + deletedFileCount + " cached files");
 }
 
 } // namespace ThumbnailRendering

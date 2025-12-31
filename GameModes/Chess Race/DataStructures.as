@@ -4,6 +4,18 @@
 
 namespace RaceMode {
 
+// Represents a tag with name and color
+class MapTag {
+    string name;
+    string color; // Hex color from TMX (e.g., "00ff00")
+
+    MapTag() {}
+    MapTag(const string &in n, const string &in c) {
+        name = n;
+        color = c;
+    }
+}
+
 // Represents a map assigned to a chess board square
 class SquareMapData {
     int tmxId = -1;                    // Trackmania Exchange map ID
@@ -12,8 +24,11 @@ class SquareMapData {
     string thumbnailUrl = "";          // URL to map thumbnail image
     UI::Texture@ thumbnailTexture;     // Loaded thumbnail texture (null if not loaded)
     bool thumbnailLoading = false;     // Whether thumbnail is currently being fetched
+    bool thumbnailFailed = false;      // Whether thumbnail download/load failed
+    int thumbnailRetryCount = 0;       // Number of times we've retried downloading
     int authorTime = -1;               // Author time in milliseconds
     int difficulty = 0;                // Difficulty rating (1-5)
+    array<MapTag@> tags;               // Map tags from TMX with colors
 
     SquareMapData() {}
 }

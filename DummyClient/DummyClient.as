@@ -145,46 +145,9 @@ namespace DummyClient {
         m.capturePiece = board[toRow][toCol];
         moveHistory.InsertLast(m);
 
-        // Handle pawn promotion
-        Piece piece = board[fromRow][fromCol];
-        if (piece.type == PieceType::Pawn) {
-            // White pawn reaches row 0, or black pawn reaches row 7
-            if ((piece.color == PieceColor::White && toRow == 0) ||
-                (piece.color == PieceColor::Black && toRow == 7)) {
-                piece.type = PieceType::Queen; // Auto-promote to queen
-            }
-        }
-
-        // Move the piece
-        board[toRow][toCol] = piece;
-        board[fromRow][fromCol] = Piece();
-
-        // Handle castling
-        if (piece.type == PieceType::King) {
-            int colDiff = toCol - fromCol;
-            if (Math::Abs(colDiff) == 2) {
-                // Kingside castling
-                if (colDiff == 2) {
-                    board[fromRow][5] = board[fromRow][7];
-                    board[fromRow][7] = Piece();
-                }
-                // Queenside castling
-                else if (colDiff == -2) {
-                    board[fromRow][3] = board[fromRow][0];
-                    board[fromRow][0] = Piece();
-                }
-            }
-        }
-
-        // Handle en passant
-        if (piece.type == PieceType::Pawn && fromCol != toCol && m.capturePiece.type == PieceType::Empty) {
-            // This was an en passant capture
-            if (piece.color == PieceColor::White) {
-                board[toRow + 1][toCol] = Piece(); // Remove captured pawn
-            } else {
-                board[toRow - 1][toCol] = Piece(); // Remove captured pawn
-            }
-        }
+        // Use our new unified move execution function
+        // For dummy client, always auto-promote to Queen
+        ExecuteChessMove(fromRow, fromCol, toRow, toCol, PieceType::Queen);
 
         // Switch turns
         currentTurn = (currentTurn == PieceColor::White) ? PieceColor::Black : PieceColor::White;
