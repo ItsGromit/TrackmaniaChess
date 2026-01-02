@@ -114,7 +114,8 @@
                 if (msg.HasKey("boardMaps") && msg["boardMaps"].GetType() != Json::Type::Null) {
                     // Server-assigned maps (multiplayer)
                     print("[Chess] Receiving board map assignments from server...");
-                    startnew(RaceMode::ApplyServerBoardMaps, msg["boardMaps"]);
+                    // Apply server maps directly (can't pass Json::Value to startnew)
+                    RaceMode::ApplyServerBoardMapsSync(msg["boardMaps"]);
                 } else {
                     // Client assigns maps (practice mode)
                     print("[Chess] Client will assign maps locally (practice mode)");

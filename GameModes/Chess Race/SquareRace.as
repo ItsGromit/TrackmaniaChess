@@ -53,18 +53,18 @@ void InitializeAndAssignMaps() {
 }
 
 /**
- * Applies server-assigned board maps (async version for use with startnew)
+ * Applies server-assigned board maps (synchronous version)
  * Used for multiplayer where server assigns maps to ensure sync
  */
-void ApplyServerBoardMaps(const Json::Value &in boardMapsJson) {
+void ApplyServerBoardMapsSync(const Json::Value &in boardMapsJson) {
     InitializeChessRace();
 
     print("[ChessRace] Applying server-assigned board maps...");
     MapAssignment::ApplyServerBoardMaps(boardMapsJson);
 
-    // Preload thumbnails if enabled
+    // Preload thumbnails if enabled (async)
     if (showThumbnails) {
-        ThumbnailRendering::PreloadAllThumbnails();
+        startnew(ThumbnailRendering::PreloadAllThumbnails);
     }
 }
 
