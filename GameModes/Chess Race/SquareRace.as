@@ -35,21 +35,13 @@ void InitializeChessRace() {
 }
 
 /**
- * Initializes and assigns maps (async version for use with startnew)
- * Used for practice mode where client assigns its own maps
+ * [DEPRECATED] Client-side map initialization removed
+ * This function should never be called - server provides maps via ApplyServerBoardMapsSync()
  */
 void InitializeAndAssignMaps() {
-    InitializeChessRace();
-
-    // Use the mappack ID received from the server (stored in activeMappackId)
-    // This ensures both players have the same map assignments
-    MapAssignment::AssignMapsFromMappack(activeMappackId);
-    print("[ChessRace] Initializing maps from server-specified mappack: " + activeMappackId);
-
-    // Preload thumbnails if enabled
-    if (showThumbnails) {
-        ThumbnailRendering::PreloadAllThumbnails();
-    }
+    error("[ChessRace] ERROR: InitializeAndAssignMaps() is deprecated!");
+    error("[ChessRace] Maps should be assigned by the server, not the client.");
+    error("[ChessRace] The server should send boardMaps in the game_start message.");
 }
 
 /**

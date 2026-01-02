@@ -237,9 +237,9 @@ async function fetchMappack(mappackId) {
   }
 
   return new Promise((resolve, reject) => {
-    // Use the modern /api/maps endpoint (same as client-side code)
-    const url = `/api/maps?mapPackId=${mappackId}&count=100`;
-    console.log(`[Chess] Fetching mappack ${mappackId} from TMX...`);
+    // Use the mappack tracks endpoint
+    const url = `/mappack/get_mappack_tracks/${mappackId}`;
+    console.log(`[Chess] Fetching mappack ${mappackId} from TMX using ${url}...`);
 
     https.get({
       host: 'trackmania.exchange',
@@ -252,15 +252,17 @@ async function fetchMappack(mappackId) {
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
         try {
-          const response = JSON.parse(data);
+          const tracks = JSON.parse(data);
 
-          // /api/maps endpoint returns {Results: [...], More: bool} format
-          if (!response || !response.Results || !Array.isArray(response.Results)) {
-            console.error('[Chess] Mappack returned invalid format (expected Results field)');
+          // Log what we actually received for debugging
+          console.log('[Chess] Response type:', typeof tracks);
+          console.log('[Chess] Response is array:', Array.isArray(tracks));
+
+          if (!Array.isArray(tracks)) {
+            console.error('[Chess] Mappack returned invalid format (expected array of tracks)');
+            console.error('[Chess] Response preview:', JSON.stringify(tracks).substring(0, 300));
             return reject(new Error('Invalid mappack response format'));
           }
-
-          const tracks = response.Results;
 
           if (tracks.length === 0) {
             console.error('[Chess] Mappack returned no tracks');
@@ -275,7 +277,7 @@ async function fetchMappack(mappackId) {
           resolve(tracks);
         } catch (e) {
           console.error('[Chess] Error parsing mappack response:', e);
-          console.error('[Chess] Response data preview:', data.substring(0, 200));
+          console.error('[Chess] Response data preview:', data.substring(0, 500));
           reject(e);
         }
       });

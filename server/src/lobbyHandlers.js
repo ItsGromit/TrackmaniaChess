@@ -226,6 +226,11 @@ async function handleStartGame(socket, msg) {
   console.log(`[Chess] Sending game_start to p1 (${p1.id}): raceMode=${gameStartMsg1.raceMode}, boardMaps=${gameStartMsg1.boardMaps ? 'present (' + gameStartMsg1.boardMaps.length + ' maps)' : 'null'}`);
   console.log(`[Chess] Sending game_start to p2 (${p2.id}): raceMode=${gameStartMsg2.raceMode}, boardMaps=${gameStartMsg2.boardMaps ? 'present (' + gameStartMsg2.boardMaps.length + ' maps)' : 'null'}`);
 
+  // Debug: Log what position 44 (E3) is assigned to verify consistency
+  if (game.boardMaps && game.boardMaps.length > 44) {
+    console.log(`[Chess] DEBUG - Position 44 (E3): ${game.boardMaps[44].mapName} (TMX ${game.boardMaps[44].tmxId})`);
+  }
+
   send(p1, gameStartMsg1);
   send(p2, gameStartMsg2);
 
