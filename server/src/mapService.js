@@ -237,8 +237,9 @@ async function fetchMappack(mappackId) {
   }
 
   return new Promise((resolve, reject) => {
-    // Use the mappack tracks endpoint
-    const url = `/mappack/get_mappack_tracks/${mappackId}`;
+    // Use the /api/maps endpoint (same as client-side code was using)
+    const fields = 'MapId,MapUid,Name,Tags';
+    const url = `/api/maps?mapPackId=${mappackId}&count=80&fields=${fields}`;
     console.log(`[Chess] Fetching mappack ${mappackId} from TMX using ${url}...`);
 
     https.get({
@@ -252,17 +253,20 @@ async function fetchMappack(mappackId) {
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
         try {
-          const tracks = JSON.parse(data);
+          const response = JSON.parse(data);
 
           // Log what we actually received for debugging
-          console.log('[Chess] Response type:', typeof tracks);
-          console.log('[Chess] Response is array:', Array.isArray(tracks));
+          console.log('[Chess] Response type:', typeof response);
+          console.log('[Chess] Response keys:', Object.keys(response));
 
-          if (!Array.isArray(tracks)) {
-            console.error('[Chess] Mappack returned invalid format (expected array of tracks)');
-            console.error('[Chess] Response preview:', JSON.stringify(tracks).substring(0, 300));
+          // The /api/maps endpoint returns {Results: [...]}
+          if (!response.Results || !Array.isArray(response.Results)) {
+            console.error('[Chess] Mappack returned invalid format (expected Results field with array)');
+            console.error('[Chess] Response preview:', JSON.stringify(response).substring(0, 500));
             return reject(new Error('Invalid mappack response format'));
           }
+
+          const tracks = response.Results;
 
           if (tracks.length === 0) {
             console.error('[Chess] Mappack returned no tracks');

@@ -184,6 +184,10 @@ void RenderMapThumbnail(int row, int col) {
     SquareMapData@ squareData = MapAssignment::boardMaps[row][col];
     if (squareData is null) return;
 
+    // Only render thumbnail if this map was assigned by the server
+    // (tmxId > 0 means server sent map data, -1 means no map assigned)
+    if (squareData.tmxId <= 0) return;
+
     // If thumbnail not loaded, try to download it
     if (squareData.thumbnailTexture is null && !squareData.thumbnailLoading) {
         // Check if this thumbnail has failed and should retry
