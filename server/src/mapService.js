@@ -225,17 +225,20 @@ function getHardcodedFallback() {
   return fallbackMaps[Math.floor(Math.random() * fallbackMaps.length)];
 }
 
-// Fetch a specific map from a mappack by position (for Chess Race mode)
-async function fetchMapFromMappack(mappackId, position) {
-  return new Promise((resolve, reject) => {
-    // Validate position is within bounds (0-63 for 8x8 board)
-    if (position < 0 || position > 63) {
-      console.error(`[Chess] Invalid board position: ${position}`);
-      return reject(new Error('Invalid board position'));
-    }
+// Cache for mappack data (mappackId -> array of tracks)
+const mappackCache = new Map();
 
+// Fetch entire mappack and return all tracks
+async function fetchMappack(mappackId) {
+  // Check cache first
+  if (mappackCache.has(mappackId)) {
+    console.log(`[Chess] Using cached mappack ${mappackId}`);
+    return mappackCache.get(mappackId);
+  }
+
+  return new Promise((resolve, reject) => {
     const url = `/mappack/get_mappack_tracks/${mappackId}`;
-    console.log(`[Chess] Fetching map at position ${position} from mappack ${mappackId}`);
+    console.log(`[Chess] Fetching mappack ${mappackId} from TMX...`);
 
     https.get({
       host: 'trackmania.exchange',
@@ -255,17 +258,12 @@ async function fetchMapFromMappack(mappackId, position) {
             return reject(new Error('No tracks in mappack'));
           }
 
-          // Get the map at the specified position (wrapping if needed)
-          const mapIndex = position % tracks.length;
-          const track = tracks[mapIndex];
+          console.log(`[Chess] Fetched mappack ${mappackId} with ${tracks.length} tracks`);
 
-          const map = {
-            tmxId: parseInt(track.TrackID),
-            name: track.GbxMapName || track.Name || `Map ${mapIndex + 1}`
-          };
+          // Cache the mappack
+          mappackCache.set(mappackId, tracks);
 
-          console.log(`[Chess] Selected map from mappack position ${position}: ${map.name} (TMX ${map.tmxId})`);
-          resolve(map);
+          resolve(tracks);
         } catch (e) {
           console.error('[Chess] Error parsing mappack response:', e);
           reject(e);
@@ -276,6 +274,29 @@ async function fetchMapFromMappack(mappackId, position) {
       reject(e);
     });
   });
+}
+
+// Fetch a specific map from a mappack by position (for Chess Race mode)
+async function fetchMapFromMappack(mappackId, position) {
+  // Validate position is within bounds (0-63 for 8x8 board)
+  if (position < 0 || position > 63) {
+    console.error(`[Chess] Invalid board position: ${position}`);
+    throw new Error('Invalid board position');
+  }
+
+  // Fetch the entire mappack (uses cache if available)
+  const tracks = await fetchMappack(mappackId);
+
+  // Get the map at the specified position (wrapping if needed)
+  const mapIndex = position % tracks.length;
+  const track = tracks[mapIndex];
+
+  const map = {
+    tmxId: parseInt(track.TrackID),
+    name: track.GbxMapName || track.Name || `Map ${mapIndex + 1}`
+  };
+
+  return map;
 }
 
 module.exports = {
