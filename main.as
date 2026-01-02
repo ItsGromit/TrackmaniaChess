@@ -7,7 +7,6 @@ void Main() {
 
 void Update(float dt) {
     Update();
-    DummyClient::Update();
 
     // Handle race state management
     RaceStateManager::Update();

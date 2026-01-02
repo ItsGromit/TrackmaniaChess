@@ -12,7 +12,8 @@
       "WebSearch",
       "WebFetch",
       "Bash(mv:*)",
-      "Bash(test:*)"
+      "Bash(test:*)",
+      "Bash(find:*)"
     ]
   }
 }

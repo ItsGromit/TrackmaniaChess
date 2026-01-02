@@ -321,19 +321,36 @@ void ClearBoardMaps() {
  */
 void ApplyServerBoardMaps(const Json::Value &in boardMapsJson) {
     if (boardMapsJson.GetType() != Json::Type::Array) {
-        warn("[MapAssignment] Invalid boardMaps format from server");
+        warn("[MapAssignment] Invalid boardMaps format from server - expected Array, got " + tostring(boardMapsJson.GetType()));
         return;
     }
 
-    print("[MapAssignment] Applying " + boardMapsJson.Length + " server-assigned maps...");
+    uint arrayLength = boardMapsJson.Length;
+    print("[MapAssignment] Applying " + arrayLength + " server-assigned maps...");
+
+    if (arrayLength == 0) {
+        warn("[MapAssignment] Server sent empty boardMaps array!");
+        return;
+    }
 
     int mapsApplied = 0;
-    for (uint i = 0; i < boardMapsJson.Length && i < 64; i++) {
+    for (uint i = 0; i < arrayLength && i < 64; i++) {
         int row = i / 8;
         int col = i % 8;
 
         Json::Value mapObj = boardMapsJson[i];
-        if (mapObj.GetType() != Json::Type::Object) continue;
+        Json::Type objType = mapObj.GetType();
+
+        if (objType != Json::Type::Object) {
+            warn("[MapAssignment] Position " + i + " is not an object (type: " + tostring(objType) + "), skipping");
+            continue;
+        }
+
+        // Check if required fields exist
+        if (!mapObj.HasKey("tmxId") || !mapObj.HasKey("mapName")) {
+            warn("[MapAssignment] Position " + i + " missing required fields (tmxId or mapName)");
+            continue;
+        }
 
         // Ensure square data exists
         if (boardMaps[row][col] is null) {
@@ -341,14 +358,29 @@ void ApplyServerBoardMaps(const Json::Value &in boardMapsJson) {
         }
 
         // Apply server-assigned data
-        boardMaps[row][col].tmxId = int(mapObj["tmxId"]);
-        boardMaps[row][col].mapName = string(mapObj["mapName"]);
-        boardMaps[row][col].thumbnailUrl = "https://trackmania.exchange/mapthumb/" + boardMaps[row][col].tmxId;
+        int tmxId = int(mapObj["tmxId"]);
+        string mapName = string(mapObj["mapName"]);
+
+        boardMaps[row][col].tmxId = tmxId;
+        boardMaps[row][col].mapName = mapName;
+        boardMaps[row][col].thumbnailUrl = "https://trackmania.exchange/mapthumb/" + tmxId;
+
+        // Log first few assignments and last one for debugging
+        if (i < 3 || i == 63) {
+            print("[MapAssignment] Position " + i + " (row " + row + ", col " + col + "): " + mapName + " (TMX " + tmxId + ")");
+        }
 
         mapsApplied++;
     }
 
-    print("[MapAssignment] Applied " + mapsApplied + " server-assigned maps to board");
+    print("[MapAssignment] Successfully applied " + mapsApplied + "/" + arrayLength + " server-assigned maps to board");
+
+    // Verify a few random squares to ensure data persisted
+    if (mapsApplied > 0) {
+        print("[MapAssignment] Verification - Square [0,0]: " + (boardMaps[0][0] !is null ? boardMaps[0][0].mapName : "NULL"));
+        print("[MapAssignment] Verification - Square [3,4]: " + (boardMaps[3][4] !is null ? boardMaps[3][4].mapName : "NULL"));
+        print("[MapAssignment] Verification - Square [7,7]: " + (boardMaps[7][7] !is null ? boardMaps[7][7].mapName : "NULL"));
+    }
 }
 
 /**

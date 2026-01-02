@@ -78,11 +78,6 @@ void RenderPlayingState() {
             gSelC = -1;
             selectedRow = -1;
             selectedCol = -1;
-
-            // Check for game over (practice mode only)
-            if (DummyClient::enabled) {
-                DummyClient::CheckGameOver();
-            }
         }
     }
 }
@@ -102,80 +97,49 @@ void RenderMoveHistory(float moveHistoryWidth, float availableHeight, float belo
     }
     UI::EndChild();
 
-    // Forfeit/Back to Menu button below move history, aligned with it
+    // Forfeit button below move history, aligned with it
     if (GameManager::currentState == GameState::Playing && !gameOver) {
         vec2 buttonCursor = UI::GetCursorPos();
         UI::SetCursorPos(vec2(buttonCursor.x, buttonCursor.y + 30.0f));
 
-        if (DummyClient::enabled) {
-            // Dummy client mode - show back to menu button
-            if (StyledButton("Back to Menu", vec2(moveHistoryWidth, belowBoardUIHeight))) {
-                DummyClient::StopGame();
-                GameManager::currentState = GameState::Menu;
-            }
-        } else {
-            // Network game - show forfeit button
-            if (StyledButton("Forfeit", vec2(moveHistoryWidth, belowBoardUIHeight))) {
-                Resign();
-            }
+        // Network game - show forfeit button
+        if (StyledButton("Forfeit", vec2(moveHistoryWidth, belowBoardUIHeight))) {
+            Resign();
         }
     }
     if (GameManager::currentState == GameState::GameOver) {
         vec2 buttonCursor = UI::GetCursorPos();
         UI::SetCursorPos(vec2(buttonCursor.x, buttonCursor.y - 5.0f));
 
-        // Check if playing against dummy client
-        if (DummyClient::enabled) {
-            // Dummy client mode - show simple play again button
-            if (StyledButton("Play Again", vec2(moveHistoryWidth, belowBoardUIHeight))) {
-                bool dummyPlaysWhite = DummyClient::isMyTurn; // If it's dummy's turn now, dummy was white
-                InitializeGlobals();
-                ApplyFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", "w");
-
-                // Set loading state for thumbnails if needed
-                if (currentRaceMode == RaceMode::SquareRace && showThumbnails) {
-                    RaceMode::ThumbnailRendering::isLoadingThumbnails = true;
-                }
-
-                GameManager::currentState = GameState::Playing;
-                DummyClient::StartGame(dummyPlaysWhite);
+        // Network game - show rematch UI based on rematch state
+        if (rematchRequestReceived) {
+            // Opponent requested rematch - show accept/decline buttons
+            UI::Text(themeSuccessTextColor + "Opponent wants a rematch!");
+            if (StyledButton("Accept Rematch", vec2(moveHistoryWidth, belowBoardUIHeight))) {
+                RespondToRematch(true);
             }
-
-            if (StyledButton("Back to Menu", vec2(moveHistoryWidth, belowBoardUIHeight))) {
-                DummyClient::StopGame();
-                GameManager::currentState = GameState::Menu;
+            if (StyledButton("Decline", vec2(moveHistoryWidth, belowBoardUIHeight))) {
+                RespondToRematch(false);
+            }
+        } else if (rematchRequestSent) {
+            // Waiting for opponent to respond
+            UI::Text(themeWarningTextColor + "Waiting for opponent...");
+            if (StyledButton("Cancel Request", vec2(moveHistoryWidth, belowBoardUIHeight))) {
+                rematchRequestSent = false;
+                UI::ShowNotification("Chess", "Rematch request cancelled", vec4(0.8,0.8,0.2,1), 3000);
             }
         } else {
-            // Network game - show rematch UI based on rematch state
-            if (rematchRequestReceived) {
-                // Opponent requested rematch - show accept/decline buttons
-                UI::Text(themeSuccessTextColor + "Opponent wants a rematch!");
-                if (StyledButton("Accept Rematch", vec2(moveHistoryWidth, belowBoardUIHeight))) {
-                    RespondToRematch(true);
-                }
-                if (StyledButton("Decline", vec2(moveHistoryWidth, belowBoardUIHeight))) {
-                    RespondToRematch(false);
-                }
-            } else if (rematchRequestSent) {
-                // Waiting for opponent to respond
-                UI::Text(themeWarningTextColor + "Waiting for opponent...");
-                if (StyledButton("Cancel Request", vec2(moveHistoryWidth, belowBoardUIHeight))) {
-                    rematchRequestSent = false;
-                    UI::ShowNotification("Chess", "Rematch request cancelled", vec4(0.8,0.8,0.2,1), 3000);
-                }
-            } else {
-                // Normal state - show rematch button
-                if (StyledButton("Request Rematch", vec2(moveHistoryWidth, belowBoardUIHeight))) {
-                    RequestNewGame();
-                }
+            // Normal state - show rematch button
+            if (StyledButton("Request Rematch", vec2(moveHistoryWidth, belowBoardUIHeight))) {
+                RequestNewGame();
             }
+        }
 
-            if (StyledButton("Back to menu", vec2(moveHistoryWidth, belowBoardUIHeight))) {
-                LeaveLobby();
-                GameManager::currentState = GameState::Menu;
-                rematchRequestReceived = false;
-                rematchRequestSent = false;
-            }
+        if (StyledButton("Back to menu", vec2(moveHistoryWidth, belowBoardUIHeight))) {
+            LeaveLobby();
+            GameManager::currentState = GameState::Menu;
+            rematchRequestReceived = false;
+            rematchRequestSent = false;
         }
     }
 }

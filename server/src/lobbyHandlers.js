@@ -3,6 +3,7 @@
 const { Chess } = require('chess.js');
 const { lobbies, games, lastOpponents } = require('./state');
 const { send, broadcastLobbyList } = require('./utils');
+const { fetchMapFromMappack } = require('./mapService');
 
 // Handle create_lobby message
 function handleCreateLobby(socket, msg) {
@@ -166,7 +167,6 @@ async function handleStartGame(socket, msg) {
   // For Chess Race mode, pre-assign maps to all 64 squares
   if (l.raceMode === 'square' && l.mappackId) {
     console.log(`[Chess] Assigning maps from mappack ${l.mappackId} to all 64 squares...`);
-    const { fetchMapFromMappack } = require('./mapService');
     const boardMaps = [];
 
     try {
@@ -174,11 +174,20 @@ async function handleStartGame(socket, msg) {
       for (let pos = 0; pos < 64; pos++) {
         const map = await fetchMapFromMappack(l.mappackId, pos);
         boardMaps.push({ tmxId: map.tmxId, mapName: map.name });
+        // Log first few assignments
+        if (pos < 3 || pos === 63) {
+          console.log(`[Chess] Position ${pos}: ${map.name} (TMX ${map.tmxId})`);
+        }
       }
       game.boardMaps = boardMaps;
       console.log(`[Chess] Successfully assigned ${boardMaps.length} maps to board`);
+      // Log a summary
+      if (boardMaps.length > 0) {
+        console.log(`[Chess] Sample assignments - pos 0: ${boardMaps[0].mapName}, pos 1: ${boardMaps[1].mapName}, pos 63: ${boardMaps[63]?.mapName}`);
+      }
     } catch (error) {
-      console.error(`[Chess] Failed to assign board maps: ${error}`);
+      console.error(`[Chess] Failed to assign board maps:`, error);
+      console.error(`[Chess] Error stack:`, error.stack);
       // Continue anyway, will fall back to random maps during gameplay
     }
   }
@@ -191,7 +200,7 @@ async function handleStartGame(socket, msg) {
     lastOpponents.set(p2, p1);
   }
 
-  send(p1, {
+  const gameStartMsg1 = {
     type: 'game_start',
     gameId,
     isWhite: p1IsWhite,
@@ -201,8 +210,8 @@ async function handleStartGame(socket, msg) {
     raceMode: l.raceMode,
     mappackId: l.mappackId,
     boardMaps: game.boardMaps // Send the map assignments
-  });
-  send(p2, {
+  };
+  const gameStartMsg2 = {
     type: 'game_start',
     gameId,
     isWhite: !p1IsWhite,
@@ -212,7 +221,13 @@ async function handleStartGame(socket, msg) {
     raceMode: l.raceMode,
     mappackId: l.mappackId,
     boardMaps: game.boardMaps // Send the map assignments
-  });
+  };
+
+  console.log(`[Chess] Sending game_start to p1 (${p1.id}): raceMode=${gameStartMsg1.raceMode}, boardMaps=${gameStartMsg1.boardMaps ? 'present (' + gameStartMsg1.boardMaps.length + ' maps)' : 'null'}`);
+  console.log(`[Chess] Sending game_start to p2 (${p2.id}): raceMode=${gameStartMsg2.raceMode}, boardMaps=${gameStartMsg2.boardMaps ? 'present (' + gameStartMsg2.boardMaps.length + ' maps)' : 'null'}`);
+
+  send(p1, gameStartMsg1);
+  send(p2, gameStartMsg2);
 
   // Keep the lobby alive for rematches instead of deleting it
   // Mark the lobby as "in game" so it doesn't show in the lobby list

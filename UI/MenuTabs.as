@@ -93,67 +93,8 @@ void RenderHomeTab() {
     if (developerMode) {
         UI::Text(themeSectionLabelColor + "Practice Mode (Developer):");
         UI::NewLine();
-        UI::TextWrapped("Play against a simple AI opponent to test the full game including racing challenges. You will be randomly assigned white or black.");
-        UI::NewLine();
-
-        // Race mode selection for practice
-        UI::Text("Game Mode:");
-        UI::SetNextItemWidth(200);
-        if (UI::BeginCombo("##practicemode", currentRaceMode == RaceMode::SquareRace ? "Chess Race" : "Capture Race (Classic)")) {
-            if (UI::Selectable("Chess Race", currentRaceMode == RaceMode::SquareRace)) {
-                currentRaceMode = RaceMode::SquareRace;
-            }
-            if (UI::Selectable("Capture Race (Classic)", currentRaceMode == RaceMode::CaptureRace)) {
-                currentRaceMode = RaceMode::CaptureRace;
-            }
-            UI::EndCombo();
-        }
-
-        // Chess Race Mode Settings - show inline if Chess Race is selected
-        if (currentRaceMode == RaceMode::SquareRace) {
-            UI::SameLine();
-            UI::Text(" | Mappack:");
-            UI::SameLine();
-            UI::SetNextItemWidth(100);
-            string mappackIdStr = "" + squareRaceMappackId;
-            mappackIdStr = UI::InputText("##practicemappackid", mappackIdStr, UI::InputTextFlags::CharsDecimal);
-            int parsedId = Text::ParseInt(mappackIdStr);
-            if (parsedId > 0) squareRaceMappackId = parsedId;
-            if (squareRaceMappackId < 1) squareRaceMappackId = 1;
-            if (UI::IsItemHovered()) {
-                UI::BeginTooltip();
-                UI::PushTextWrapPos(250.0f);
-                UI::Text("TMX Mappack ID (default: 7237 for Chess Race). Find mappack IDs at trackmania.exchange");
-                UI::PopTextWrapPos();
-                UI::EndTooltip();
-            }
-        }
-        UI::NewLine();
-
-        if (StyledButton("Start Practice Game", vec2(200.0f, 30.0f))) {
-            InitializeGlobals();
-            ApplyFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", "w");
-
-            // Initialize new race mode if selected
-            if (currentRaceMode == RaceMode::SquareRace) {
-                // Set loading state BEFORE changing game state so loading screen shows first
-                if (showThumbnails) {
-                    RaceMode::ThumbnailRendering::isLoadingThumbnails = true;
-                }
-
-                // For practice mode, use the local mappack setting
-                activeMappackId = squareRaceMappackId;
-                startnew(RaceMode::InitializeAndAssignMaps);
-            }
-
-            // Change to playing state AFTER setting up loading
-            GameManager::currentState = GameState::Playing;
-
-            // Randomly assign colors (like the server does)
-            bool dummyPlaysWhite = (Math::Rand(0, 2) == 0);
-            DummyClient::StartGame(dummyPlaysWhite);
-        }
-
+        UI::TextDisabled("Practice mode has been removed.");
+        UI::TextDisabled("Use multiplayer to play Chess Race!");
         UI::NewLine();
         UI::NewLine();
     }

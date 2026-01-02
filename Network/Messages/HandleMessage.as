@@ -111,14 +111,31 @@
             // Initialize Chess Race mode
             if (currentRaceMode == RaceMode::SquareRace) {
                 // Check if server sent board map assignments
-                if (msg.HasKey("boardMaps") && msg["boardMaps"].GetType() != Json::Type::Null) {
-                    // Server-assigned maps (multiplayer)
-                    print("[Chess] Receiving board map assignments from server...");
-                    // Apply server maps directly (can't pass Json::Value to startnew)
-                    RaceMode::ApplyServerBoardMapsSync(msg["boardMaps"]);
+                if (msg.HasKey("boardMaps")) {
+                    Json::Type boardMapsType = msg["boardMaps"].GetType();
+                    print("[Chess] boardMaps field present - type: " + tostring(boardMapsType));
+
+                    if (boardMapsType == Json::Type::Array) {
+                        uint mapCount = msg["boardMaps"].Length;
+                        print("[Chess] Receiving " + mapCount + " board map assignments from server...");
+
+                        // Log first few maps for debugging
+                        if (mapCount > 0) {
+                            print("[Chess] Sample server maps - pos 0: " + string(msg["boardMaps"][0]["mapName"]) + ", pos 1: " + string(msg["boardMaps"][1]["mapName"]));
+                        }
+
+                        // Apply server maps directly (can't pass Json::Value to startnew)
+                        RaceMode::ApplyServerBoardMapsSync(msg["boardMaps"]);
+                    } else if (boardMapsType == Json::Type::Null) {
+                        print("[Chess] boardMaps is null - client will assign maps locally (practice mode)");
+                        startnew(RaceMode::InitializeAndAssignMaps);
+                    } else {
+                        warn("[Chess] boardMaps has unexpected type: " + tostring(boardMapsType));
+                        startnew(RaceMode::InitializeAndAssignMaps);
+                    }
                 } else {
                     // Client assigns maps (practice mode)
-                    print("[Chess] Client will assign maps locally (practice mode)");
+                    print("[Chess] No boardMaps field - client will assign maps locally (practice mode)");
                     startnew(RaceMode::InitializeAndAssignMaps);
                 }
             }

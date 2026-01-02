@@ -1,6 +1,6 @@
 void FetchPracticeModeRaceMap() {
     print("[Chess] Fetching random campaign map for practice race...");
-    // Store the values that were already set by the dummy client
+    // Store the values for the race challenge
     string savedCaptureFrom = captureFrom;
     string savedCaptureTo = captureTo;
     bool savedIsDefender = isDefender;
