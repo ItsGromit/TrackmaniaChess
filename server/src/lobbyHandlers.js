@@ -70,7 +70,8 @@ function handleJoinLobby(socket, msg) {
       playerNames: l.playerNames,
       hostId: l.host.id,
       password: !!l.password,
-      mapFilters: l.mapFilters
+      mapFilters: l.mapFilters,
+      raceMode: l.raceMode
     });
   }
   broadcastLobbyList();
@@ -95,7 +96,8 @@ function handleLeaveLobby(socket, msg) {
         playerNames: l.playerNames,
         hostId: l.host.id,
         password: !!l.password,
-        mapFilters: l.mapFilters
+        mapFilters: l.mapFilters,
+        raceMode: l.raceMode
       });
     }
   }

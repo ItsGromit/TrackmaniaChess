@@ -34,6 +34,16 @@ bool showMapFiltersWindow = false;
  */
 void RenderLobbyList() {
     UI::Text("\\$f80Available Lobbies:");
+    UI::SameLine();
+
+    // Add some spacing before the refresh button
+    float availWidth = UI::GetContentRegionAvail().x;
+    UI::SetCursorPos(UI::GetCursorPos() + vec2(availWidth - 100.0f, 0));
+
+    if (StyledButton(Icons::Refresh + " Refresh", vec2(100.0f, 0))) {
+        ListLobbies();
+    }
+
     UI::Separator();
 
     if (lobbies.Length == 0) {

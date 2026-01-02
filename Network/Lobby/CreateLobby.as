@@ -1,4 +1,4 @@
-void CreateLobby(const string &in roomTitle = "", const string &in password = "", const string &in playerName = "") {
+void CreateLobby(const string &in roomTitle = "", const string &in password = "", const string &in raceModeOverride = "", const string &in playerName = "") {
     Json::Value j = Json::Object();
     j["type"] = "create_lobby";
     // Always generate random 5-letter room code
@@ -17,8 +17,15 @@ void CreateLobby(const string &in roomTitle = "", const string &in password = ""
     // Get local player name
     string name = playerName.Length > 0 ? playerName : GetLocalPlayerName();
     j["playerName"] = name;
-    // Send race mode selection
-    string raceMode = currentRaceMode == RaceMode::SquareRace ? "square" : "capture";
+    // Send race mode selection - use override if provided, otherwise use current global mode
+    string raceMode;
+    if (raceModeOverride.Length > 0) {
+        raceMode = raceModeOverride;
+        // Update currentRaceMode to match
+        currentRaceMode = (raceModeOverride == "square") ? RaceMode::SquareRace : RaceMode::CaptureRace;
+    } else {
+        raceMode = currentRaceMode == RaceMode::SquareRace ? "square" : "capture";
+    }
     j["raceMode"] = raceMode;
     currentLobbyRaceMode = raceMode; // Store locally
 

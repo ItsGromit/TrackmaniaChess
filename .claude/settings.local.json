@@ -10,7 +10,9 @@
       "Bash(curl:*)",
       "Bash(python:*)",
       "WebSearch",
-      "WebFetch"
+      "WebFetch",
+      "Bash(mv:*)",
+      "Bash(test:*)"
     ]
   }
 }

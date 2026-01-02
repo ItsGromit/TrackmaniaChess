@@ -38,6 +38,8 @@
             // Store the lobby's race mode
             if (msg.HasKey("raceMode")) {
                 currentLobbyRaceMode = string(msg["raceMode"]);
+                // Update the global currentRaceMode enum
+                currentRaceMode = (currentLobbyRaceMode == "square") ? RaceMode::SquareRace : RaceMode::CaptureRace;
             }
             // Initialize player names array (creator is the only player initially)
             currentLobbyPlayerNames.Resize(0);
@@ -54,6 +56,8 @@
                 // Store the lobby's race mode
                 if (msg.HasKey("raceMode")) {
                     currentLobbyRaceMode = string(msg["raceMode"]);
+                    // Update the global currentRaceMode enum
+                    currentRaceMode = (currentLobbyRaceMode == "square") ? RaceMode::SquareRace : RaceMode::CaptureRace;
                 }
                 // Store player names
                 currentLobbyPlayerNames.Resize(0);

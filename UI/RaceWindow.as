@@ -46,18 +46,27 @@ void RenderRaceWindow() {
 
         // Show opponent's status and time
         UI::Text(themeSectionLabelColor + "\\$f80Opponent");
+
+        // Show opponent's live time if they're currently racing
         if (opponentIsRacing && opponentRaceTime >= 0) {
             // Opponent is currently racing - show live time
             int oppSeconds = opponentRaceTime / 1000;
             int oppMilliseconds = opponentRaceTime % 1000;
             UI::Text(themeSuccessTextColor + "Racing: \\$fff" + oppSeconds + "." + Text::Format("%03d", oppMilliseconds) + "s");
-        } else if (!isDefender && defenderTime > 0) {
+        }
+        // Show defender's finished time if available (for attackers)
+        else if (!isDefender && defenderTime > 0) {
             // Attacker view: show defender's finished time
             int defSeconds = defenderTime / 1000;
             int defMilliseconds = defenderTime % 1000;
-            UI::Text("Finished: \\$fff" + defSeconds + "." + Text::Format("%03d", defMilliseconds) + "s");
-        } else {
-            // Opponent hasn't started yet
+            UI::Text("Time to Beat: \\$fff" + defSeconds + "." + Text::Format("%03d", defMilliseconds) + "s");
+        }
+        // Defender view: show if opponent has started
+        else if (isDefender && opponentIsRacing) {
+            UI::Text(themeSuccessTextColor + "Opponent is racing...");
+        }
+        // Default: opponent not racing
+        else {
             UI::TextDisabled("Not racing");
         }
 

@@ -177,6 +177,10 @@ void RenderMapThumbnail(int row, int col) {
     // Get the square's map data
     if (row < 0 || row >= 8 || col < 0 || col >= 8) return;
 
+    // Check if boardMaps is initialized
+    if (MapAssignment::boardMaps.Length <= uint(row)) return;
+    if (MapAssignment::boardMaps[row].Length <= uint(col)) return;
+
     SquareMapData@ squareData = MapAssignment::boardMaps[row][col];
     if (squareData is null) return;
 
@@ -240,7 +244,14 @@ void PreloadAllThumbnails() {
 
     // Count thumbnails that need to be downloaded
     for (int row = 0; row < 8; row++) {
+        // Check if row exists
+        if (uint(row) >= MapAssignment::boardMaps.Length) break;
+        if (MapAssignment::boardMaps[row].Length == 0) continue;
+
         for (int col = 0; col < 8; col++) {
+            // Check if column exists
+            if (uint(col) >= MapAssignment::boardMaps[row].Length) break;
+
             SquareMapData@ squareData = MapAssignment::boardMaps[row][col];
             if (squareData !is null && squareData.tmxId > 0) {
                 // Only count if not already loaded
@@ -262,7 +273,14 @@ void PreloadAllThumbnails() {
 
     // Start downloading
     for (int row = 0; row < 8; row++) {
+        // Check if row exists
+        if (uint(row) >= MapAssignment::boardMaps.Length) break;
+        if (MapAssignment::boardMaps[row].Length == 0) continue;
+
         for (int col = 0; col < 8; col++) {
+            // Check if column exists
+            if (uint(col) >= MapAssignment::boardMaps[row].Length) break;
+
             SquareMapData@ squareData = MapAssignment::boardMaps[row][col];
             if (squareData !is null && squareData.tmxId > 0) {
                 DownloadThumbnail(squareData);

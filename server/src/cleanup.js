@@ -22,7 +22,9 @@ function cleanupOnDisconnect(sock) {
             players: l.players.map(x => x.id),
             playerNames: l.playerNames,
             hostId: l.host.id,
-            password: !!l.password
+            password: !!l.password,
+            mapFilters: l.mapFilters,
+            raceMode: l.raceMode
           });
         }
       }
