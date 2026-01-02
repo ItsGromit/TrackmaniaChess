@@ -108,9 +108,18 @@
             ApplyFEN(fen, turn);
             GameManager::currentState = GameState::Playing;
 
-            // Initialize new race mode if selected
+            // Initialize Chess Race mode
             if (currentRaceMode == RaceMode::SquareRace) {
-                startnew(RaceMode::InitializeAndAssignMaps);
+                // Check if server sent board map assignments
+                if (msg.HasKey("boardMaps") && msg["boardMaps"].GetType() != Json::Type::Null) {
+                    // Server-assigned maps (multiplayer)
+                    print("[Chess] Receiving board map assignments from server...");
+                    startnew(RaceMode::ApplyServerBoardMaps, msg["boardMaps"]);
+                } else {
+                    // Client assigns maps (practice mode)
+                    print("[Chess] Client will assign maps locally (practice mode)");
+                    startnew(RaceMode::InitializeAndAssignMaps);
+                }
             }
 
             print("[Chess] Game state updated to Playing");

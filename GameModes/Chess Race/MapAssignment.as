@@ -316,6 +316,42 @@ void ClearBoardMaps() {
 }
 
 /**
+ * Apply server-assigned board maps (for multiplayer sync)
+ * The server sends an array of 64 map objects with tmxId and mapName
+ */
+void ApplyServerBoardMaps(const Json::Value &in boardMapsJson) {
+    if (boardMapsJson.GetType() != Json::Type::Array) {
+        warn("[MapAssignment] Invalid boardMaps format from server");
+        return;
+    }
+
+    print("[MapAssignment] Applying " + boardMapsJson.Length + " server-assigned maps...");
+
+    int mapsApplied = 0;
+    for (uint i = 0; i < boardMapsJson.Length && i < 64; i++) {
+        int row = i / 8;
+        int col = i % 8;
+
+        Json::Value mapObj = boardMapsJson[i];
+        if (mapObj.GetType() != Json::Type::Object) continue;
+
+        // Ensure square data exists
+        if (boardMaps[row][col] is null) {
+            @boardMaps[row][col] = RaceMode::SquareMapData();
+        }
+
+        // Apply server-assigned data
+        boardMaps[row][col].tmxId = int(mapObj["tmxId"]);
+        boardMaps[row][col].mapName = string(mapObj["mapName"]);
+        boardMaps[row][col].thumbnailUrl = "https://trackmania.exchange/mapthumb/" + boardMaps[row][col].tmxId;
+
+        mapsApplied++;
+    }
+
+    print("[MapAssignment] Applied " + mapsApplied + " server-assigned maps to board");
+}
+
+/**
  * Retrieves the map data for a specific square
  *
  * @param row The row index (0-7)

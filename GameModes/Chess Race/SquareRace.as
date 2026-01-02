@@ -36,6 +36,7 @@ void InitializeChessRace() {
 
 /**
  * Initializes and assigns maps (async version for use with startnew)
+ * Used for practice mode where client assigns its own maps
  */
 void InitializeAndAssignMaps() {
     InitializeChessRace();
@@ -44,6 +45,22 @@ void InitializeAndAssignMaps() {
     // This ensures both players have the same map assignments
     MapAssignment::AssignMapsFromMappack(activeMappackId);
     print("[ChessRace] Initializing maps from server-specified mappack: " + activeMappackId);
+
+    // Preload thumbnails if enabled
+    if (showThumbnails) {
+        ThumbnailRendering::PreloadAllThumbnails();
+    }
+}
+
+/**
+ * Applies server-assigned board maps (async version for use with startnew)
+ * Used for multiplayer where server assigns maps to ensure sync
+ */
+void ApplyServerBoardMaps(const Json::Value &in boardMapsJson) {
+    InitializeChessRace();
+
+    print("[ChessRace] Applying server-assigned board maps...");
+    MapAssignment::ApplyServerBoardMaps(boardMapsJson);
 
     // Preload thumbnails if enabled
     if (showThumbnails) {

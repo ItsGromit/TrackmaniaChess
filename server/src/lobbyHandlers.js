@@ -128,7 +128,7 @@ function handleGetMapFilters(socket, msg) {
 }
 
 // Handle start_game message
-function handleStartGame(socket, msg) {
+async function handleStartGame(socket, msg) {
   const l = lobbies.get(msg.lobbyId);
   if (!l) return;
   if (l.host !== socket) return; // only host can start
@@ -159,8 +159,30 @@ function handleStartGame(socket, msg) {
     createdAt: Date.now(),
     mapFilters: l.mapFilters || {},
     raceMode: l.raceMode || 'capture',
-    mappackId: l.mappackId || null
+    mappackId: l.mappackId || null,
+    boardMaps: null
   };
+
+  // For Chess Race mode, pre-assign maps to all 64 squares
+  if (l.raceMode === 'square' && l.mappackId) {
+    console.log(`[Chess] Assigning maps from mappack ${l.mappackId} to all 64 squares...`);
+    const { fetchMapFromMappack } = require('./mapService');
+    const boardMaps = [];
+
+    try {
+      // Assign maps to all 64 positions (0-63)
+      for (let pos = 0; pos < 64; pos++) {
+        const map = await fetchMapFromMappack(l.mappackId, pos);
+        boardMaps.push({ tmxId: map.tmxId, mapName: map.name });
+      }
+      game.boardMaps = boardMaps;
+      console.log(`[Chess] Successfully assigned ${boardMaps.length} maps to board`);
+    } catch (error) {
+      console.error(`[Chess] Failed to assign board maps: ${error}`);
+      // Continue anyway, will fall back to random maps during gameplay
+    }
+  }
+
   games.set(gameId, game);
 
   // Store opponents for rematch
@@ -177,7 +199,8 @@ function handleStartGame(socket, msg) {
     fen: chess.fen(),
     turn: 'w',
     raceMode: l.raceMode,
-    mappackId: l.mappackId
+    mappackId: l.mappackId,
+    boardMaps: game.boardMaps // Send the map assignments
   });
   send(p2, {
     type: 'game_start',
@@ -187,7 +210,8 @@ function handleStartGame(socket, msg) {
     fen: chess.fen(),
     turn: 'w',
     raceMode: l.raceMode,
-    mappackId: l.mappackId
+    mappackId: l.mappackId,
+    boardMaps: game.boardMaps // Send the map assignments
   });
 
   // Keep the lobby alive for rematches instead of deleting it

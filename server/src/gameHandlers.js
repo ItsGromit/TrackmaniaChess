@@ -38,14 +38,14 @@ async function handleMove(socket, msg) {
 
     // Get map based on race mode
     let map;
-    if (game.raceMode === 'square' && game.mappackId) {
-      // Chess Race mode: use assigned map for the target square
+    if (game.raceMode === 'square' && game.boardMaps) {
+      // Chess Race mode: use pre-assigned map for the target square
       const position = algebraicToPosition(to);
-      console.log(`[Chess] Chess Race mode - using map at position ${position} (${to}) from mappack ${game.mappackId}`);
-      try {
-        map = await fetchMapFromMappack(game.mappackId, position);
-      } catch (error) {
-        console.error(`[Chess] Failed to fetch map from mappack, falling back to random: ${error}`);
+      if (position >= 0 && position < game.boardMaps.length) {
+        map = game.boardMaps[position];
+        console.log(`[Chess] Chess Race mode - using pre-assigned map at position ${position} (${to}): ${map.mapName} (TMX ${map.tmxId})`);
+      } else {
+        console.error(`[Chess] Invalid position ${position}, falling back to random map`);
         map = await fetchRandomShortMap(game.mapFilters || {});
       }
     } else {
