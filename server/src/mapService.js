@@ -237,7 +237,8 @@ async function fetchMappack(mappackId) {
   }
 
   return new Promise((resolve, reject) => {
-    const url = `/mappack/get_mappack_tracks/${mappackId}`;
+    // Use the modern /api/maps endpoint (same as client-side code)
+    const url = `/api/maps?mapPackId=${mappackId}&count=100`;
     console.log(`[Chess] Fetching mappack ${mappackId} from TMX...`);
 
     https.get({
@@ -251,9 +252,17 @@ async function fetchMappack(mappackId) {
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
         try {
-          const tracks = JSON.parse(data);
+          const response = JSON.parse(data);
 
-          if (!Array.isArray(tracks) || tracks.length === 0) {
+          // /api/maps endpoint returns {Results: [...], More: bool} format
+          if (!response || !response.Results || !Array.isArray(response.Results)) {
+            console.error('[Chess] Mappack returned invalid format (expected Results field)');
+            return reject(new Error('Invalid mappack response format'));
+          }
+
+          const tracks = response.Results;
+
+          if (tracks.length === 0) {
             console.error('[Chess] Mappack returned no tracks');
             return reject(new Error('No tracks in mappack'));
           }
@@ -266,6 +275,7 @@ async function fetchMappack(mappackId) {
           resolve(tracks);
         } catch (e) {
           console.error('[Chess] Error parsing mappack response:', e);
+          console.error('[Chess] Response data preview:', data.substring(0, 200));
           reject(e);
         }
       });
@@ -291,9 +301,10 @@ async function fetchMapFromMappack(mappackId, position) {
   const mapIndex = position % tracks.length;
   const track = tracks[mapIndex];
 
+  // /api/maps endpoint uses MapId and Name fields (not TrackID and GbxMapName)
   const map = {
-    tmxId: parseInt(track.TrackID),
-    name: track.GbxMapName || track.Name || `Map ${mapIndex + 1}`
+    tmxId: parseInt(track.MapId || track.TrackID),
+    name: track.Name || track.GbxMapName || `Map ${mapIndex + 1}`
   };
 
   return map;
