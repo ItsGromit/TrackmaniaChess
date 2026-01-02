@@ -225,6 +225,60 @@ function getHardcodedFallback() {
   return fallbackMaps[Math.floor(Math.random() * fallbackMaps.length)];
 }
 
+// Fetch a specific map from a mappack by position (for Chess Race mode)
+async function fetchMapFromMappack(mappackId, position) {
+  return new Promise((resolve, reject) => {
+    // Validate position is within bounds (0-63 for 8x8 board)
+    if (position < 0 || position > 63) {
+      console.error(`[Chess] Invalid board position: ${position}`);
+      return reject(new Error('Invalid board position'));
+    }
+
+    const url = `/mappack/get_mappack_tracks/${mappackId}`;
+    console.log(`[Chess] Fetching map at position ${position} from mappack ${mappackId}`);
+
+    https.get({
+      host: 'trackmania.exchange',
+      path: url,
+      headers: {
+        'User-Agent': 'TrackmaniaChessRace/1.0'
+      }
+    }, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try {
+          const tracks = JSON.parse(data);
+
+          if (!Array.isArray(tracks) || tracks.length === 0) {
+            console.error('[Chess] Mappack returned no tracks');
+            return reject(new Error('No tracks in mappack'));
+          }
+
+          // Get the map at the specified position (wrapping if needed)
+          const mapIndex = position % tracks.length;
+          const track = tracks[mapIndex];
+
+          const map = {
+            tmxId: parseInt(track.TrackID),
+            name: track.GbxMapName || track.Name || `Map ${mapIndex + 1}`
+          };
+
+          console.log(`[Chess] Selected map from mappack position ${position}: ${map.name} (TMX ${map.tmxId})`);
+          resolve(map);
+        } catch (e) {
+          console.error('[Chess] Error parsing mappack response:', e);
+          reject(e);
+        }
+      });
+    }).on('error', (e) => {
+      console.error('[Chess] Error fetching mappack:', e);
+      reject(e);
+    });
+  });
+}
+
 module.exports = {
-  fetchRandomShortMap
+  fetchRandomShortMap,
+  fetchMapFromMappack
 };

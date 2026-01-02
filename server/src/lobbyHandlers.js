@@ -152,7 +152,15 @@ function handleStartGame(socket, msg) {
   const white = p1IsWhite ? p1 : p2;
   const black = p1IsWhite ? p2 : p1;
 
-  const game = { white, black, chess, createdAt: Date.now(), mapFilters: l.mapFilters || {} };
+  const game = {
+    white,
+    black,
+    chess,
+    createdAt: Date.now(),
+    mapFilters: l.mapFilters || {},
+    raceMode: l.raceMode || 'capture',
+    mappackId: l.mappackId || null
+  };
   games.set(gameId, game);
 
   // Store opponents for rematch

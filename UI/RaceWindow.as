@@ -111,35 +111,6 @@ void RenderRaceWindow() {
 
         UI::NewLine();
 
-        // Manual finish button
-        if (!playerFinishedRace && raceStartedAt > 0) {
-            UI::Separator();
-            UI::TextWrapped(themeWarningTextColor + "After finishing, click the button below to submit your time:");
-            UI::NewLine();
-            if (UI::Button("Submit Finish Time")) {
-                int currentTime = GetCurrentRaceTime();
-                if (currentTime > 0) {
-                    print("[RaceDetection] Manual finish - submitting time: " + currentTime + "ms");
-
-                    playerFinishedRace = true;
-                    playerRaceTime = currentTime;
-
-                    // Send race result to server (if in network game)
-                    if (gameId != "") {
-                        Json::Value j = Json::Object();
-                        j["type"] = "race_result";
-                        j["gameId"] = gameId;
-                        j["time"] = playerRaceTime;
-                        SendJson(j);
-                        print("[RaceDetection] Sent race_result to server: " + playerRaceTime + "ms");
-                    } else {
-                        // In practice mode, exit immediately
-                        GameManager::currentState = GameState::Playing;
-                    }
-                }
-            }
-        }
-
         // Results
         if (playerFinishedRace) {
             UI::NewLine();

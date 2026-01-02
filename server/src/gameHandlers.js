@@ -3,7 +3,15 @@
 const { Chess } = require('chess.js');
 const { games, lobbies, lastOpponents, raceChallenges, rematchRequests, rerollRequests } = require('./state');
 const { send, broadcastPlayers, toAlgebra } = require('./utils');
-const { fetchRandomShortMap } = require('./mapService');
+const { fetchRandomShortMap, fetchMapFromMappack } = require('./mapService');
+
+// Convert algebraic notation to board position (0-63)
+// a8=0, b8=1, ..., h8=7, a7=8, ..., h1=63
+function algebraicToPosition(square) {
+  const file = square.charCodeAt(0) - 'a'.charCodeAt(0); // 0-7
+  const rank = 8 - parseInt(square[1]); // 0-7 (rank 8 is 0, rank 1 is 7)
+  return rank * 8 + file;
+}
 
 // Handle move message
 async function handleMove(socket, msg) {
@@ -28,8 +36,23 @@ async function handleMove(socket, msg) {
     // Trigger a race challenge instead of immediate capture
     console.log(`[Chess] Capture detected: ${from} -> ${to}, triggering race challenge`);
 
-    // Get a random map using the game's filters
-    const map = await fetchRandomShortMap(game.mapFilters || {});
+    // Get map based on race mode
+    let map;
+    if (game.raceMode === 'square' && game.mappackId) {
+      // Chess Race mode: use assigned map for the target square
+      const position = algebraicToPosition(to);
+      console.log(`[Chess] Chess Race mode - using map at position ${position} (${to}) from mappack ${game.mappackId}`);
+      try {
+        map = await fetchMapFromMappack(game.mappackId, position);
+      } catch (error) {
+        console.error(`[Chess] Failed to fetch map from mappack, falling back to random: ${error}`);
+        map = await fetchRandomShortMap(game.mapFilters || {});
+      }
+    } else {
+      // Capture Race (classic) mode: use random map with filters
+      console.log(`[Chess] Capture Race mode - using random map`);
+      map = await fetchRandomShortMap(game.mapFilters || {});
+    }
 
     // Store the pending capture
     const challenge = {
