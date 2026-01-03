@@ -43,6 +43,13 @@ uint64 lastRaceUpdateSent = 0;       // Last time we sent a race update (throttl
 int lastPlayerStartTime = -1;        // Track player's last start time to detect restarts
 int lastPlayerRaceTime = 0;          // Track last race time to detect if time went backwards (full restart)
 
+// Race result tracking (to keep results window open after returning to board)
+bool showRaceResults = false;        // Whether to show race results window
+bool lastRaceCaptureSucceeded = false; // Whether the last race capture succeeded
+int lastRacePlayerTime = -1;         // Player's final time in last race
+int lastRaceOpponentTime = -1;       // Opponent's final time in last race
+bool lastRacePlayerWasDefender = false; // Whether player was defender in last race
+
 const array<string> FILES = {"a", "b", "c", "d", "e", "f", "g", "h"};
 
 array<Lobby> lobbies;

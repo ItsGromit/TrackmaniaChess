@@ -19,7 +19,7 @@ void RenderMenu() {
 }
 
 void Render() {
-    // Always render race window if in race state
+    // Render race window if in race state
     if (GameManager::currentState == GameState::RaceChallenge) {
         RenderRaceWindow();
 
@@ -33,6 +33,11 @@ void Render() {
         if (collapseChessWindow) {
             showWindow = true;
             collapseChessWindow = false;
+        }
+
+        // Show race results window alongside chess board
+        if (showRaceResults) {
+            RenderRaceResultsWindow();
         }
     }
 

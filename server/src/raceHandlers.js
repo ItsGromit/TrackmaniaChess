@@ -57,6 +57,30 @@ function handleRaceResult(socket, msg) {
           fen,
           turn: nextTurn
         });
+
+        // Check if game is over after the move
+        if (game.chess.isGameOver()) {
+          let reason = 'draw', winner = null;
+          if (game.chess.isCheckmate()) {
+            reason = 'checkmate';
+            winner = (nextTurn === 'w' ? 'black' : 'white');
+          } else if (game.chess.isStalemate()) {
+            reason = 'stalemate';
+          } else if (game.chess.isThreefoldRepetition()) {
+            reason = 'threefold';
+          } else if (game.chess.isInsufficientMaterial()) {
+            reason = 'insufficient';
+          }
+          broadcastPlayers(game, {
+            type: 'game_over',
+            gameId: msg.gameId,
+            reason,
+            winner
+          });
+
+          // Clean up game
+          games.delete(msg.gameId);
+        }
       }
     } else {
       // Defender won, capture fails - board stays the same
@@ -131,6 +155,30 @@ function handleRaceRetire(socket, msg) {
           fen,
           turn: nextTurn
         });
+
+        // Check if game is over after the move
+        if (game.chess.isGameOver()) {
+          let reason = 'draw', winner = null;
+          if (game.chess.isCheckmate()) {
+            reason = 'checkmate';
+            winner = (nextTurn === 'w' ? 'black' : 'white');
+          } else if (game.chess.isStalemate()) {
+            reason = 'stalemate';
+          } else if (game.chess.isThreefoldRepetition()) {
+            reason = 'threefold';
+          } else if (game.chess.isInsufficientMaterial()) {
+            reason = 'insufficient';
+          }
+          broadcastPlayers(game, {
+            type: 'game_over',
+            gameId: msg.gameId,
+            reason,
+            winner
+          });
+
+          // Clean up game
+          games.delete(msg.gameId);
+        }
       }
     } else {
       // Capture fails

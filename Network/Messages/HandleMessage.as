@@ -104,6 +104,7 @@
             moveHistory.Resize(0); // Clear move history for new game
             rematchRequestReceived = false;
             rematchRequestSent = false;
+            showRaceResults = false; // Hide race results from previous game
 
             ApplyFEN(fen, turn);
             GameManager::currentState = GameState::Playing;
@@ -215,6 +216,13 @@
             string turn = string(msg["turn"]);
 
             print("[Chess] Race result - Capture " + (captureSucceeded ? "succeeded" : "failed"));
+
+            // Save race results to show in results window
+            showRaceResults = true;
+            lastRaceCaptureSucceeded = captureSucceeded;
+            lastRacePlayerTime = playerRaceTime;
+            lastRaceOpponentTime = opponentRaceTime;
+            lastRacePlayerWasDefender = isDefender;
 
             // Apply the board state
             ApplyFEN(fen, turn);
