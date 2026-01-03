@@ -155,6 +155,12 @@
                 int fromRow, fromCol, toRow, toCol;
                 if (AlgToRowCol(fromAlg, fromRow, fromCol) && AlgToRowCol(toAlg, toRow, toCol)) {
                     Move@ m = Move(fromRow, fromCol, toRow, toCol);
+
+                    // Store SAN notation if provided by server
+                    if (msg.HasKey("san")) {
+                        m.san = string(msg["san"]);
+                    }
+
                     moveHistory.InsertLast(m);
                 }
             }

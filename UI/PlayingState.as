@@ -88,11 +88,35 @@ void RenderPlayingState() {
 void RenderMoveHistory(float moveHistoryWidth, float availableHeight, float belowBoardUIHeight) {
     UI::BeginChild("MoveHistory", vec2(moveHistoryWidth, availableHeight - 40.0f), true);
     UI::Text("Move History:");
-    for (uint i = 0; i < moveHistory.Length; i++) {
-        Move@ m = moveHistory[i];
-        string moveText = "" + (i + 1) + ". " +
-                        GetColumnName(m.fromCol) + (8 - m.fromRow) + " -> " +
-                        GetColumnName(m.toCol) + (8 - m.toRow);
+
+    // Display moves in proper chess notation: "1. e4 e5  2. Nf3 Nc6"
+    for (uint i = 0; i < moveHistory.Length; i += 2) {
+        Move@ whiteMove = moveHistory[i];
+        string moveText = "" + ((i / 2) + 1) + ". ";
+
+        // Add white's move
+        if (whiteMove.san != "") {
+            moveText += whiteMove.san;
+        } else {
+            // Fallback to algebraic notation if SAN not available
+            moveText += GetColumnName(whiteMove.fromCol) + (8 - whiteMove.fromRow) +
+                       GetColumnName(whiteMove.toCol) + (8 - whiteMove.toRow);
+        }
+
+        // Add black's move if it exists
+        if (i + 1 < moveHistory.Length) {
+            Move@ blackMove = moveHistory[i + 1];
+            moveText += " ";
+
+            if (blackMove.san != "") {
+                moveText += blackMove.san;
+            } else {
+                // Fallback to algebraic notation if SAN not available
+                moveText += GetColumnName(blackMove.fromCol) + (8 - blackMove.fromRow) +
+                           GetColumnName(blackMove.toCol) + (8 - blackMove.toRow);
+            }
+        }
+
         UI::Text(moveText);
     }
     UI::EndChild();
