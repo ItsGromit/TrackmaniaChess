@@ -66,8 +66,9 @@
                         currentLobbyPlayerNames.InsertLast(string(msg["playerNames"][j]));
                     }
                 }
-                // Transition to InLobby state when joining
-                if (currentLobbyId.Length > 0 && GameManager::currentState == GameState::InQueue) {
+                // Transition to InLobby state when joining (from InQueue or Menu state)
+                if (currentLobbyId.Length > 0 &&
+                    (GameManager::currentState == GameState::InQueue || GameManager::currentState == GameState::Menu)) {
                     GameManager::currentState = GameState::InLobby;
                     // Request current map filters when joining lobby (only for Capture Race mode)
                     if (currentLobbyRaceMode == "capture") {
