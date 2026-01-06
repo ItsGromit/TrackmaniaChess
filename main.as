@@ -3,6 +3,7 @@ void Main() {
     InitializeGlobals();
     LoadPieceAssets();
     LoadLogo();
+    ChessAudio::LoadSounds();
 }
 
 void Update(float dt) {

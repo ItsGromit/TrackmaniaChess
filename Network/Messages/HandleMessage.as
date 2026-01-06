@@ -148,6 +148,7 @@
             string turn = string(msg["turn"]);
 
             // Parse move information and add to history
+            string san = "";
             if (msg.HasKey("from") && msg.HasKey("to")) {
                 string fromAlg = string(msg["from"]);
                 string toAlg = string(msg["to"]);
@@ -160,6 +161,7 @@
                     // Store SAN notation if provided by server
                     if (msg.HasKey("san")) {
                         m.san = string(msg["san"]);
+                        san = m.san;
                     }
 
                     moveHistory.InsertLast(m);
@@ -167,10 +169,35 @@
             }
 
             ApplyFEN(fen, turn);
+
+            // Play sound effects based on the move
+            if (san.Length > 0) {
+                if (san.Contains("O-O")) {
+                    // Castling move
+                    ChessAudio::PlayCastleSound();
+                } else if (san.Contains("+")) {
+                    // Check (includes moves ending with + but not #)
+                    if (!san.Contains("#")) {
+                        ChessAudio::PlayCheckSound();
+                    }
+                } else if (san.Contains("x")) {
+                    // Capture
+                    ChessAudio::PlayCaptureSound();
+                } else {
+                    // Normal move
+                    ChessAudio::PlayMoveSound();
+                }
+            }
         } else if (t == "game_over") {
             string reason = string(msg["reason"]);
             string winner = msg.HasKey("winner") ? string(msg["winner"]) : "none";
             print("[Chess] Game over - reason: " + reason + ", winner: " + winner + ", gameId: " + gameId);
+
+            // Play checkmate sound
+            if (reason == "checkmate") {
+                ChessAudio::PlayCheckmateSound();
+            }
+
             GameManager::currentState = GameState::GameOver;
             gameOver = true;
             gameResult = (winner.Length > 0 ? winner : "none") + " — " + reason;
