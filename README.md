@@ -121,7 +121,7 @@ My discord is: itsgromit
 
 ## License
 
-[Add your license here]
+The plugin AND the server are both licensed under the GNU General Public License v3.0.
 
 ## Support
 
