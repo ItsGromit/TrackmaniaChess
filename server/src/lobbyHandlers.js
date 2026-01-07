@@ -7,6 +7,24 @@ const { fetchMapFromMappack } = require('./mapService');
 
 // Handle create_lobby message
 function handleCreateLobby(socket, msg) {
+  // Check if the user is already hosting a lobby and remove it first
+  for (const [existingId, existingLobby] of [...lobbies.entries()]) {
+    if (existingLobby.host === socket) {
+      console.log(`[Lobby] User ${socket.id} already hosting lobby ${existingId}, removing it before creating new lobby...`);
+      // Notify other players in the old lobby that it's being closed
+      for (const player of existingLobby.players) {
+        if (player !== socket) {
+          send(player, {
+            type: 'lobby_closed',
+            lobbyId: existingId,
+            message: 'Host created a new lobby'
+          });
+        }
+      }
+      lobbies.delete(existingId);
+    }
+  }
+
   const id = msg.lobbyId || msg.roomCode || Math.random().toString(36).slice(2, 9).toUpperCase();
   const lobby = {
     id,
