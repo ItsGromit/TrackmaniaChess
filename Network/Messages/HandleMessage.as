@@ -9,6 +9,14 @@
         if (t == "hello") {
             playerId = string(msg["id"]);
         }
+        else if (t == "version_mismatch") {
+            string requiredVersion = msg.HasKey("requiredVersion") ? string(msg["requiredVersion"]) : "unknown";
+            string currentVersion = msg.HasKey("clientVersion") ? string(msg["clientVersion"]) : PLUGIN_VERSION;
+            print("[Chess] VERSION MISMATCH - Server requires version " + requiredVersion + ", you have " + currentVersion);
+            UI::ShowNotification("Chess Race - Version Mismatch", "Please update your plugin to version " + requiredVersion + ". You have " + currentVersion + ".", vec4(1,0.2,0.2,1), 10000);
+            // Disconnect from server
+            Disconnect();
+        }
         else if (t == "lobby_list") {
             lobbies.Resize(0);
             auto arr = msg["lobbies"];

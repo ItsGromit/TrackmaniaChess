@@ -1,13 +1,31 @@
 // messageRouter.js - Routes messages to appropriate handlers
 
+const connectionHandlers = require('./connectionHandlers');
 const lobbyHandlers = require('./lobbyHandlers');
 const gameHandlers = require('./gameHandlers');
 const raceHandlers = require('./raceHandlers');
+const { validatedClients } = require('./state');
 const { send } = require('./utils');
 
 // Main message router
 async function onMessage(socket, msg) {
   const { type } = msg || {};
+
+  // Allow handshake without validation
+  if (type === 'handshake') {
+    return connectionHandlers.handleHandshake(socket, msg);
+  }
+
+  // All other messages require a validated client
+  if (!validatedClients.has(socket)) {
+    console.log(`[Security] Client ${socket.id} attempted ${type} without completing handshake`);
+    send(socket, {
+      type: 'error',
+      code: 'HANDSHAKE_REQUIRED',
+      message: 'You must complete the handshake before sending messages'
+    });
+    return;
+  }
 
   switch (type) {
     // Lobby flows

@@ -9,6 +9,13 @@ bool Connect() {
     if (sock is null) Init();
     bool ok = sock.Connect(serverHost, uint16(serverPort));
     isConnected = ok;
+    if (ok) {
+        // Send client version to server for validation
+        Json::Value handshake = Json::Object();
+        handshake["type"] = "handshake";
+        handshake["version"] = PLUGIN_VERSION;
+        SendJson(handshake);
+    }
     return ok;
 }
 // Disconnect function

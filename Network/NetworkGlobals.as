@@ -2,6 +2,10 @@ Net::Socket@ sock;
 bool isConnected = false;
 [Setting category="Network" name="Server host"] string serverHost = "yamanote.proxy.rlwy.net";
 [Setting category="Network" name="Server port"] uint serverPort = 36621;
+
+// Plugin version - must match server's required version
+const string PLUGIN_VERSION = "1.0";
+
 // =================
 // Network variables
 // =================

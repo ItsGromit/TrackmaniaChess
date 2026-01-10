@@ -17,9 +17,13 @@ const TCP_PORT = Number(process.env.PORT || 29802);
 // Stats logging interval (ms)
 const STATS_INTERVAL = 50000;
 
+// Required client version
+const REQUIRED_CLIENT_VERSION = '1.0';
+
 module.exports = {
   BLACKLISTED_AUTHORS,
   BLACKLISTED_MAPPACKS,
   TCP_PORT,
-  STATS_INTERVAL
+  STATS_INTERVAL,
+  REQUIRED_CLIENT_VERSION
 };

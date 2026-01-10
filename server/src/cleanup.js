@@ -1,10 +1,13 @@
 // cleanup.js - Cleanup handlers for disconnects
 
-const { lobbies, games, lastOpponents } = require('./state');
+const { lobbies, games, lastOpponents, validatedClients } = require('./state');
 const { send, broadcastPlayers } = require('./utils');
 
 // Cleanup on client disconnect
 function cleanupOnDisconnect(sock) {
+  // Remove from validated clients
+  validatedClients.delete(sock);
+
   // remove from lobbies
   for (const [id, l] of [...lobbies.entries()]) {
     if (l.players.includes(sock)) {
