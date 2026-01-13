@@ -9,6 +9,75 @@ namespace ColorCustomization {
         if (UI::Begin("Color Customization", showColorCustomizationWindow, windowFlags)) {
             UI::BeginTabBar("ColorTabs");
 
+            // Theme Preset Tab
+            if (UI::BeginTabItem("Theme Presets")) {
+                UI::NewLine();
+                UI::Text(themeSectionLabelColor + "Select a Theme:");
+                UI::NewLine();
+
+                UI::Text("Choose a preset theme or customize individual colors in other tabs.");
+                UI::NewLine();
+
+                // Default Theme
+                UI::BeginGroup();
+                UI::PushStyleColor(UI::Col::Button, vec4(0.2f, 0.5f, 0.8f, 1.0f));
+                UI::PushStyleColor(UI::Col::ButtonHovered, vec4(0.25f, 0.55f, 0.85f, 1.0f));
+                UI::PushStyleColor(UI::Col::ButtonActive, vec4(0.15f, 0.45f, 0.75f, 1.0f));
+                if (UI::Button("Default Theme", vec2(200.0f, 40.0f))) {
+                    ApplyTheme(ThemePreset::Default);
+                }
+                UI::PopStyleColor(3);
+                if (currentTheme == ThemePreset::Default) {
+                    UI::SameLine();
+                    UI::Text(themeSuccessTextColor + "(Active)");
+                }
+                UI::TextWrapped("The original blue and brown theme with moderate opacity.");
+                UI::EndGroup();
+
+                UI::NewLine();
+
+                // Light Theme
+                UI::BeginGroup();
+                UI::PushStyleColor(UI::Col::Button, vec4(0.3f, 0.6f, 0.9f, 1.0f));
+                UI::PushStyleColor(UI::Col::ButtonHovered, vec4(0.35f, 0.65f, 0.95f, 1.0f));
+                UI::PushStyleColor(UI::Col::ButtonActive, vec4(0.25f, 0.55f, 0.85f, 1.0f));
+                if (UI::Button("Light Theme", vec2(200.0f, 40.0f))) {
+                    ApplyTheme(ThemePreset::Light);
+                }
+                UI::PopStyleColor(3);
+                if (currentTheme == ThemePreset::Light) {
+                    UI::SameLine();
+                    UI::Text(themeSuccessTextColor + "(Active)");
+                }
+                UI::TextWrapped("Bright, clean colors with higher opacity for better visibility.");
+                UI::EndGroup();
+
+                UI::NewLine();
+
+                // Dark Theme
+                UI::BeginGroup();
+                UI::PushStyleColor(UI::Col::Button, vec4(0.15f, 0.35f, 0.55f, 1.0f));
+                UI::PushStyleColor(UI::Col::ButtonHovered, vec4(0.2f, 0.4f, 0.6f, 1.0f));
+                UI::PushStyleColor(UI::Col::ButtonActive, vec4(0.1f, 0.3f, 0.5f, 1.0f));
+                if (UI::Button("Dark Theme", vec2(200.0f, 40.0f))) {
+                    ApplyTheme(ThemePreset::Dark);
+                }
+                UI::PopStyleColor(3);
+                if (currentTheme == ThemePreset::Dark) {
+                    UI::SameLine();
+                    UI::Text(themeSuccessTextColor + "(Active)");
+                }
+                UI::TextWrapped("Dark, muted colors for a subtle appearance.");
+                UI::EndGroup();
+
+                UI::NewLine();
+                UI::Separator();
+                UI::NewLine();
+                UI::TextWrapped("Note: You can select a theme and then customize individual colors in the other tabs. The theme setting will update to reflect your custom choices.");
+
+                UI::EndTabItem();
+            }
+
             // Button Colors Tab
             if (UI::BeginTabItem("Button Colors")) {
                 UI::NewLine();

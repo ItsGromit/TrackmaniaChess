@@ -10,11 +10,13 @@
 void MainMenu() {
     int windowFlags = windowResizeable ? 0 : UI::WindowFlags::NoResize;
 
+    // Apply theme window background color
+    UI::PushStyleColor(UI::Col::WindowBg, themeWindowBgColor);
+
     // Make title bar have same opacity as window background
-    vec4 bgColor = UI::GetStyleColor(UI::Col::WindowBg);
-    UI::PushStyleColor(UI::Col::TitleBg, bgColor);
-    UI::PushStyleColor(UI::Col::TitleBgActive, bgColor);
-    UI::PushStyleColor(UI::Col::TitleBgCollapsed, bgColor);
+    UI::PushStyleColor(UI::Col::TitleBg, themeWindowBgColor);
+    UI::PushStyleColor(UI::Col::TitleBgActive, themeWindowBgColor);
+    UI::PushStyleColor(UI::Col::TitleBgCollapsed, themeWindowBgColor);
 
     if (UI::Begin("Chess Race Classic", showWindow, windowFlags)) {
 
@@ -47,8 +49,8 @@ void MainMenu() {
     }
     UI::End();
 
-    // Pop the title bar style colors
-    UI::PopStyleColor(3);
+    // Pop the window background and title bar style colors
+    UI::PopStyleColor(4);
 
     // Render map filters popup window (independent of main window)
     Lobby::RenderMapFiltersWindow();
