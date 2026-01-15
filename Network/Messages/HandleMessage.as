@@ -85,6 +85,27 @@
                 }
             }
         }
+        else if (t == "lobby_closed") {
+            string closedLobbyId = string(msg["lobbyId"]);
+            string message = msg.HasKey("message") ? string(msg["message"]) : "Lobby was closed";
+            print("[Chess] Lobby closed - " + message);
+
+            // Only process if this was our current lobby
+            if (closedLobbyId == currentLobbyId) {
+                // Show notification to the player
+                UI::ShowNotification("Chess", "Lobby closed: " + message, vec4(1,0.4,0.4,1), 5000);
+
+                // Reset lobby state (similar to LeaveLobby)
+                currentLobbyId = "";
+                currentLobbyPassword = "";
+                currentLobbyRaceMode = "capture";
+                currentLobbyPlayerNames.Resize(0);
+                isHost = false;
+
+                // Return to menu
+                GameManager::currentState = GameState::Menu;
+            }
+        }
         else if (t == "game_start") {
             gameId  = string(msg["gameId"]);
             isWhite = bool(msg["isWhite"]);

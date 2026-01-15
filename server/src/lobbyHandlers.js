@@ -100,12 +100,31 @@ function handleJoinLobby(socket, msg) {
 function handleLeaveLobby(socket, msg) {
   const l = lobbies.get(msg.lobbyId);
   if (!l) return;
+
+  // If the host is leaving, close the lobby and notify all other players
+  if (l.host === socket) {
+    console.log(`[Lobby] Host leaving lobby ${l.id}, closing lobby...`);
+    // Notify all other players that the lobby is closed
+    for (const p of l.players) {
+      if (p !== socket) {
+        send(p, {
+          type: 'lobby_closed',
+          lobbyId: l.id,
+          message: 'The host has left the lobby'
+        });
+      }
+    }
+    lobbies.delete(l.id);
+    broadcastLobbyList();
+    return;
+  }
+
+  // Non-host player leaving
   l.players = l.players.filter(p => p !== socket);
   l.playerNames = l.playerNames.filter((_, i) => l.players[i] != null);
   if (l.players.length === 0) {
     lobbies.delete(l.id);
   } else {
-    if (l.host === socket) l.host = l.players[0];
     l.open = l.players.length < 2;
     for (const p of l.players) {
       send(p, {
